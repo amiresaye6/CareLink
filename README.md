@@ -1,65 +1,109 @@
-# CareLink - Clinic Appointment System
+# CareLink - Clinic Appointment System: Setup Guide
 
-## 🚀 Getting Started (Team Setup Guide)
+This guide will take you from a fresh folder to a fully functioning development environment with a seeded MySQL database. Follow these steps carefully to ensure the **Multiple App Architecture** is correctly initialized.
 
-Follow these steps to get the Django project running on your local machine.
+---
 
-### 1. Clone the Repository
-```bash
-git clone https://github.com/amiresaye6/CareLink
-cd CareLink
+### 1. Environment & Dependencies
+First, we need to isolate our Python environment and install the engine that runs CareLink.
+
+**Create and Activate Virtual Environment:**
 ```
 
-### 2. Set Up the Virtual Environment
-*⚠️ Note: Ensure you use the correct activation command for your specific terminal to avoid errors.*
+powershell
 
-**If using Windows PowerShell:**
-```powershell
+# Windows PowerShell
+
 python -m venv care_link_venv
 .\care_link_venv\Scripts\Activate.ps1
-```
 
-**If using Git Bash (Windows):**
-```bash
+# Git Bash / Mac / Linux
+
 python -m venv care_link_venv
 source care_link_venv/Scripts/activate
 ```
 
-**If using Mac / Linux:**
+**Install Core Libraries:**
 ```bash
-python3 -m venv care_link_venv
-source care_link_venv/bin/activate
+pip install -r Dependencies.txt
 ```
 
-### 3. Install Dependencies
-Once your environment is active (you should see `(care_link_venv)` in your terminal prompt), install the required packages:
-```bash
-pip install django djangorestframework mysqlclient
-```
-*(Note: If we add more packages later, we will use `pip install -r requirements.txt`)*
+---
 
-### 4. Database Configuration
-1. Open MySQL Workbench (or your preferred SQL client).
-2. Create the empty database:
-```sql
-CREATE DATABASE care_link_db;
-```
-3. Check `settings.py` and ensure the `DATABASES` configuration matches your local MySQL `USER` and `PASSWORD`.
+### 2. Database Configuration
 
-### 5. Run Migrations & Create Admin
-Let Django build the tables mapping to our Custom User Model and architecture:
+Before running any Django commands, we must prepare the MySQL backend.
+
+1.  **Create the Schema:** Open MySQL Workbench and run:
+    ```sql
+    CREATE DATABASE care_link_db;
+    ```
+2.  **Verify Settings:** Open `carelink_project/.env` and ensure the `DATABASES` block matches your local credentials:
+    ```python
+    'DB_USER': 'yourUserName_here',
+    'DB_PASSWORD': 'your_password_here',
+    ```
+
+---
+
+### 3. The "First Run" Migrations
+
+Since we are using a **Custom User Model** (`accounts.User`), you must apply migrations before creating any users or seeding data.
+
 ```bash
+
+# 1. Generate the blueprints for all 4 apps (accounts, appointments, medical, dashboard)
+
 python manage.py makemigrations
+
+# 2. Build the physical tables in care_link_db
+
 python manage.py migrate
 ```
-Create your local admin account so you can log into the backend:
+
+---
+
+### 4. Seeding the Database (The Team Shortcut)
+
+To save the team from manually adding doctors and patients, run our custom seed script. This populates the clinic with realistic data, schedules, and appointments.
+
+```bash
+python manage.py seed
+```
+
+> **💡 Note for the Team:** > You can now log into the system using any of these accounts:
+>
+> - **Usernames:** `donia_doc`, `mohamed_doc`, `hager_rec`, `amir_maula`
+> - **Password:** `password123`
+
+---
+
+### 5. Accessing the Backend (Superuser)
+
+If you want to access the default Django Admin panel (`/admin`) to view the raw database tables, create your own master account:
+
 ```bash
 python manage.py createsuperuser
 ```
 
-### 6. Run the Server
-Start the development server:
+---
+
+### 6. Launching the System
+
+Fire up the development server to verify everything is working.
+
 ```bash
-python manage.py runserver
+python manage.py runserver 1234
 ```
-The app should now be running at `http://127.0.0.1:8000/`. Happy coding!
+
+- **Public Site:** `http://127.0.0.1:1234/`
+- **Admin Dashboard:** `http://127.0.0.1:1234/admin/`
+
+---
+
+### 📂 App Responsibility Matrix
+
+- **`accounts/`**: Authentication, Custom User, and Doctor/Patient Profiles.
+- **`appointments/`**: Availability, Slot Booking, and the Receptionist Queue.
+- **`medical/`**: EMR records, Consultation notes, and Prescriptions.
+- **`dashboard/`**: (Your Work) Custom Analytics, Statistics, and Management Overviews.

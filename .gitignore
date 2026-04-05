@@ -1,3 +1,6 @@
 .env
 care_link_venv/
 prompt.txt
+__pycache__/
+media/
+.vscode/

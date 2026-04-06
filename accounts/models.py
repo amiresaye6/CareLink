@@ -32,3 +32,9 @@ class DoctorProfile(models.Model):
 
     def __str__(self):
         return f"Dr. {self.user.username} - {self.specialty}"
+
+
+class ReceptionistProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='receptionist_profile')
+    doctor = models.ForeignKey(DoctorProfile,on_delete=models.CASCADE)
+    

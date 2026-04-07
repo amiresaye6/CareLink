@@ -7,6 +7,7 @@ class User(AbstractUser):
         ('DOCTOR', 'Doctor'),
         ('RECEPTIONIST', 'Receptionist'),
         ('ADMIN', 'Admin'),
+        ('TO_BE_ADMIN', 'To Be Admin')
     )
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
 
@@ -36,5 +37,7 @@ class DoctorProfile(models.Model):
 
 class ReceptionistProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='receptionist_profile')
-    doctor = models.ForeignKey(DoctorProfile,on_delete=models.CASCADE)
-    
+    doctor = models.OneToOneField(DoctorProfile, on_delete=models.CASCADE, related_name='receptionist_profile')
+
+    def __str__(self):
+        return f"Receptionist: {self.user.username} for Dr. {self.doctor.user.username}"

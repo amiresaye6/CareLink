@@ -1,10 +1,12 @@
 from django.shortcuts import render
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view ,permission_classes
 from rest_framework.response import Response
 from accounts.models import User
 from django.contrib.auth import hashers
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from .serializers import SignUpAdminSerializer, SignUpDoctorSerializer , SignUpPatientSerializer, SignUpReceptionistSerializer, SignUpUserSerializer
+from .serializers import DoctorProfileSerializer, PatientProfileSerializer, ReceptionistProfileSerializer, AdminProfileSerializer
 
 @api_view(['POST'])
 def signup(request):
@@ -34,3 +36,35 @@ def signup(request):
     return Response({'errors': serializer.errors , "message": "Invalid data"}, status=status.HTTP_400_BAD_REQUEST)
   
 
+@api_view(['GET','PATCH'])
+@permission_classes([IsAuthenticated])
+def profile(request):
+    user = request.user
+    role = user.role
+    
+    if role == 'DOCTOR':
+        instance = user.doctor_profile
+        serializer_class = DoctorProfileSerializer
+    elif role == 'PATIENT':
+        instance = user.patient_profile
+        serializer_class = PatientProfileSerializer
+    elif role == 'RECEPTIONIST':
+        instance = user.receptionist_profile
+        serializer_class = ReceptionistProfileSerializer
+    elif role == 'ADMIN':
+        instance = user 
+        serializer_class = AdminProfileSerializer
+    else:
+        return Response({'message': 'Invalid role'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if request.method == 'GET':
+        serializer = serializer_class(instance)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    elif request.method == 'PATCH':
+        serializer = serializer_class(instance, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+   

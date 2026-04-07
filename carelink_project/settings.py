@@ -9,6 +9,17 @@ https://docs.djangoproject.com/en/6.0/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
+import django
+from django.db.backends.base.base import BaseDatabaseWrapper
+
+BaseDatabaseWrapper.check_database_version_supported = lambda self: None
+
+from django.db.backends.mysql.features import DatabaseFeatures
+DatabaseFeatures.can_return_rows_from_bulk_insert = property(lambda self: False)
+DatabaseFeatures.can_return_columns_from_insert = property(lambda self: False)
+
+
+
 
 from datetime import timedelta
 from pathlib import Path
@@ -101,7 +112,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': env('DB_NAME'),
         'USER': env('DB_USER'),
-        'PASSWORD': env('DB_PASSWORD'),
+        'PASSWORD': '',
         'HOST': env('DB_HOST'),
         'PORT': env('DB_PORT'),
     }

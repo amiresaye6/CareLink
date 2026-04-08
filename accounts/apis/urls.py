@@ -1,4 +1,4 @@
-from django.urls import include, path
+from django.urls import  path
 from accounts import views
 from .views import signup , profile
 from rest_framework.authtoken.views import obtain_auth_token

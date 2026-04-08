@@ -13,8 +13,11 @@ def signup(request):
     data = request.data
     role = data.get('role')
     email = data.get('email')
+    username = data.get('username')
     if User.objects.filter(email=email).exists():
         return Response({'message': 'Email already exists'}, status=status.HTTP_400_BAD_REQUEST)
+    if(User.objects.filter(username=username).exists()):
+        return Response({'message': 'Username already exists'}, status=status.HTTP_400_BAD_REQUEST)
     
     serializer = None
     if role == 'DOCTOR':

@@ -9,7 +9,7 @@ class SignUpDoctorSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True, required=True, min_length=8)
     #specialty = serializers.CharField(required=True,write_only=True)
     specialty = serializers.ChoiceField(choices=DoctorProfile.SPECIALTY_CHOICES, required=True, write_only=True)
-    session_duration = serializers.IntegerField(required=True,write_only=True)
+    session_duration = serializers.ChoiceField(choices=DoctorProfile.SESSION_CHOICES, required=True, write_only=True)
     buffer_time = serializers.IntegerField(required=True,write_only=True)
 
     def create(self, validated_data):

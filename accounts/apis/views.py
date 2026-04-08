@@ -72,3 +72,9 @@ def profile(request):
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
    
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def logout(request):
+    request.user.auth_token.delete()
+    return Response({'message': 'Logged out successfully'}, status=status.HTTP_200_OK)

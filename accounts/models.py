@@ -25,9 +25,16 @@ class PatientProfile(models.Model):
 
 class DoctorProfile(models.Model):
     SESSION_CHOICES = ((15, '15 Minutes'), (30, '30 Minutes'))
-    
+    SPECIALTY_CHOICES = (
+        ('CARDIOLOGY', 'Cardiology'),
+        ('DERMATOLOGY', 'Dermatology'),
+        ('NEUROLOGY', 'Neurology'),
+        ('PEDIATRICS', 'Pediatrics'),
+        ('ORTHOPEDICS', 'Orthopedics'),
+        ('GENERAL', 'General Practice')
+    )
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='doctor_profile')
-    specialty = models.CharField(max_length=100)
+    specialty = models.CharField(max_length=100, choices=SPECIALTY_CHOICES)
     session_duration = models.IntegerField(choices=SESSION_CHOICES, default=30)
     buffer_time = models.IntegerField(default=5)
 

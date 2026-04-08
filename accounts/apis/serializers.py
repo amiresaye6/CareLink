@@ -7,7 +7,8 @@ class SignUpDoctorSerializer(serializers.Serializer):
     username = serializers.CharField(required=True, max_length=150)
     email = serializers.EmailField(required=True, max_length=254)
     password = serializers.CharField(write_only=True, required=True, min_length=8)
-    specialty = serializers.CharField(required=True,write_only=True)
+    #specialty = serializers.CharField(required=True,write_only=True)
+    specialty = serializers.ChoiceField(choices=DoctorProfile.SPECIALTY_CHOICES, required=True, write_only=True)
     session_duration = serializers.IntegerField(required=True,write_only=True)
     buffer_time = serializers.IntegerField(required=True,write_only=True)
 

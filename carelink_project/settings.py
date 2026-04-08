@@ -61,7 +61,7 @@ INSTALLED_APPS = [
     'appointments.apps.AppointmentsConfig',
     'medical.apps.MedicalConfig',
     'dashboard.apps.DashboardConfig',
-    'rest_framework_simplejwt',
+    'rest_framework.authtoken',
 ]
 
 MIDDLEWARE = [
@@ -119,18 +119,15 @@ DATABASES = {
 }
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    )
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ]
 }
 
-SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME' : timedelta(days=15),
-    'REFRESH_TOKEN_LIFETIME' : timedelta(days=1),
-    'BLACKLIST_AFTER_ROTATION' : True,
-    'AUTH_HEADER_TYPES' : ('Bearer',),
-    'AUTH_TOKEN_CLASSES' : ('rest_framework_simplejwt.tokens.AccessToken',)
-}
+
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
 

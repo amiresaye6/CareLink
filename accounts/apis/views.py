@@ -1,14 +1,14 @@
-from django.shortcuts import render
 from rest_framework.decorators import api_view ,permission_classes
 from rest_framework.response import Response
 from accounts.models import User
-from django.contrib.auth import hashers
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.authtoken.models import Token
 from .serializers import SignUpAdminSerializer, SignUpDoctorSerializer , SignUpPatientSerializer, SignUpReceptionistSerializer, SignUpUserSerializer
 from .serializers import DoctorProfileSerializer, PatientProfileSerializer, ReceptionistProfileSerializer, AdminProfileSerializer
 
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def signup(request):
     data = request.data
     role = data.get('role')
@@ -32,7 +32,8 @@ def signup(request):
         return Response({'message': 'Serializer not found for the given role'}, status=status.HTTP_400_BAD_REQUEST)
     if serializer.is_valid():
         CreatedUser = serializer.save()
-        return Response({'message': 'User created successfully',"user":serializer.data}, status=status.HTTP_201_CREATED)
+        token,created = Token.objects.get_or_create(user=CreatedUser)
+        return Response({'message': 'User created successfully',"user":serializer.data, "token": token.key}, status=status.HTTP_201_CREATED)
     return Response({'errors': serializer.errors , "message": "Invalid data"}, status=status.HTTP_400_BAD_REQUEST)
   
 

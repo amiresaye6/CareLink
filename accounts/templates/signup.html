@@ -1,0 +1,170 @@
+<!--
+<div class="card">
+  <h1>Sign Up</h1>
+  <p class="sub muted">Create a new account.</p>
+
+  
+
+  <form method="post" enctype="multipart/form-data" class="user-form" style="display:grid;grid-template-columns:1fr 300px;gap:1rem;">
+    {% csrf_token %}
+
+    <div style="grid-column:1/-1">
+      <label for="id_first_name">First name <span style="color:var(--accent)">*</span></label>
+      <input id="id_first_name" name="first_name" type="text" required  style="width:100%;padding:.6rem;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Manrope:wght@600;800&display=swap" rel="stylesheet">
+
+    <div class="signup-page">
+      <style>
+        :root{
+          --outline-variant: #c2c6d4;
+          --primary-fixed-dim: #a9c7ff;
+          --on-secondary: #ffffff;
+          --surface-container: #edeef0;
+          --secondary-fixed-dim: #bfc8d0;
+          --tertiary-container: #9f4300;
+          --on-primary: #ffffff;
+          --primary-container: #005eb8;
+          --error-container: #ffdad6;
+          --on-tertiary-fixed-variant: #793100;
+          --on-error: #ffffff;
+          --surface-variant: #e1e2e4;
+          --secondary-container: #d8e1ea;
+          --primary-fixed: #d6e3ff;
+          --on-surface: #191c1e;
+          --on-primary-fixed-variant: #00468c;
+          --on-tertiary-container: #ffcfb9;
+          --outline: #727783;
+          --inverse-on-surface: #f0f1f3;
+          --on-primary-fixed: #001b3d;
+          --on-tertiary: #ffffff;
+          --on-secondary-fixed: #141d23;
+          --primary: #00478d;
+          --surface-bright: #f8f9fb;
+          --background: #f8f9fb;
+          --error: #ba1a1a;
+          --tertiary-fixed: #ffdbcb;
+          --surface: #f8f9fb;
+          --tertiary-fixed-dim: #ffb691;
+          --surface-dim: #d9dadc;
+          --surface-tint: #005db6;
+          --secondary-fixed: #dbe4ed;
+          --surface-container-lowest: #ffffff;
+          --inverse-primary: #a9c7ff;
+          --secondary: #575f67;
+          --on-background: #191c1e;
+          --on-secondary-container: #5b646b;
+          --on-secondary-fixed-variant: #3f484f;
+          --on-surface-variant: #424752;
+          --on-tertiary-fixed: #341100;
+          --surface-container-highest: #e1e2e4;
+          --tertiary: #793100;
+          --on-primary-container: #c8daff;
+          --inverse-surface: #2e3132;
+          --on-error-container: #93000a;
+          --surface-container-high: #e7e8ea;
+          --surface-container-low: #f3f4f6;
+
+          --radius-default: 0.25rem;
+          --radius-lg: 0.5rem;
+          --radius-xl: 0.75rem;
+
+          --font-headline: 'Manrope', sans-serif;
+          --font-body: 'Inter', sans-serif;
+          --font-label: 'Inter', sans-serif;
+        }
+
+        .signup-page{font-family:var(--font-body);background:var(--background);color:var(--on-surface);padding:2rem;display:flex;justify-content:center}
+        .card{background:var(--surface-container-lowest);border-radius:var(--radius-xl);padding:2rem;width:720px;max-width:100%;box-shadow:0 10px 30px rgba(4,12,24,0.06)}
+        h1{font-family:var(--font-headline);margin:0 0 .25rem;color:var(--primary)}
+        .sub.muted{color:var(--on-surface-variant);margin:0 0 1rem}
+        form.user-form{display:grid;grid-template-columns:1fr 300px;gap:1rem}
+        form.user-form .full{grid-column:1/-1}
+        label{display:block;margin-bottom:.35rem;font-family:var(--font-label);font-weight:600;color:var(--on-surface-variant)}
+        .form-input,.form-select{width:100%;padding:.6rem;border-radius:var(--radius-lg);border:1px solid var(--surface-dim);background:var(--surface-container-low);color:var(--on-surface);box-sizing:border-box}
+        .form-select{background:linear-gradient(180deg,var(--surface-container-low),var(--surface));}
+        .btn{background:linear-gradient(90deg,var(--primary-fixed-dim),var(--inverse-primary));color:var(--on-primary-fixed);padding:.6rem .9rem;border-radius:var(--radius-lg);border:0;font-weight:700;cursor:pointer}
+        .btn:active{transform:translateY(1px)}
+        @media (max-width:760px){form.user-form{grid-template-columns:1fr}.card{padding:1rem}}
+      </style>
+
+      <div class="card">
+        <h1>Sign Up</h1>
+        <p class="sub muted">Create a new account.</p>
+
+        <form method="post" enctype="multipart/form-data" class="user-form">
+          {% csrf_token %}
+
+          <div class="full">
+            <label for="id_username">Username <span style="color:var(--primary)">*</span></label>
+            <input id="id_username" name="username" type="text" required class="form-input" placeholder="Username">
+          </div>
+
+          <div>
+            <label for="id_email">Email <span style="color:var(--primary)">*</span></label>
+            <input id="id_email" name="email" type="email" required class="form-input" placeholder="user@example.com">
+          </div>
+
+          <div>
+            <label for="id_password">Password <span style="color:var(--primary)">*</span></label>
+            <input id="id_password" name="password" type="password" required minlength="8" class="form-input" placeholder="Choose a strong password">
+          </div>
+
+          <div>
+            <label for="id_role">Role <span style="color:var(--primary)">*</span></label>
+            <select id="id_role" name="role" required class="form-select">
+              <option value="">Select a role</option>
+              <option value="PATIENT">Patient</option>
+              <option value="DOCTOR">Doctor</option>
+              <option value="RECEPTIONIST">Receptionist</option>
+              <option value="ADMIN">Admin</option>
+            </select>
+          </div>
+
+          {% if(role == "PATIENT") %}
+            <div>
+                <label for="id_date_of_birth">Date of Birth</label>
+                <input id="id_date_of_birth" name="date_of_birth" type="date" class="form-input">
+            </div>
+            <div>
+                <label for="id_phone_number">Phone Number</label>
+                <input id="id_phone_number" name="phone_number" type="tel" class="form-input">
+            </div>
+            <div>
+                <label for="id_medical_history">Medical History</label>
+                <input id="id_medical_history" name="medical_history" type="text" class="form-input">
+            </div>
+          {% endif %}
+
+          {% if(role == "DOCTOR") %}
+            <div>
+                <select id="id_session_duration" name="session_duration" required class="form-select">
+                <option value="">Select a session duration </option>
+                <option value="15">15 minutes</option>
+                <option value="30">30 minutes</option>
+            </div>
+
+            <div>
+                <label for="id_specialty">Specialty</label>
+                <input id="id_specialty" name="specialty" type="text" class="form-input">
+            </div>
+            <div>
+                <label for="id_buffer_time">Buffer Time</label>
+                <input id="id_buffer_time" name="buffer_time" type="text" class="form-input">
+            </div>
+          {% endif %}
+
+          {% if(role == "RECEPTIONIST") %}
+            <div>
+                <label for="id_doctor">Doctor</label>
+                <input id="id_doctor" name="doctor" type="text" class="form-input">
+            </div>
+          {% endif %}
+
+          <div class="full" style="display:flex;gap:.5rem;align-items:center;margin-top:.25rem">
+            <button class="btn" type="submit">Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+-->

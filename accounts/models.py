@@ -7,6 +7,7 @@ class User(AbstractUser):
         ('DOCTOR', 'Doctor'),
         ('RECEPTIONIST', 'Receptionist'),
         ('ADMIN', 'Admin'),
+        ('TO_BE_ADMIN', 'To Be Admin')
     )
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
 
@@ -24,11 +25,26 @@ class PatientProfile(models.Model):
 
 class DoctorProfile(models.Model):
     SESSION_CHOICES = ((15, '15 Minutes'), (30, '30 Minutes'))
-    
+    SPECIALTY_CHOICES = (
+        ('CARDIOLOGY', 'Cardiology'),
+        ('DERMATOLOGY', 'Dermatology'),
+        ('NEUROLOGY', 'Neurology'),
+        ('PEDIATRICS', 'Pediatrics'),
+        ('ORTHOPEDICS', 'Orthopedics'),
+        ('GENERAL', 'General Practice')
+    )
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='doctor_profile')
-    specialty = models.CharField(max_length=100)
+    specialty = models.CharField(max_length=100, choices=SPECIALTY_CHOICES)
     session_duration = models.IntegerField(choices=SESSION_CHOICES, default=30)
     buffer_time = models.IntegerField(default=5)
 
     def __str__(self):
         return f"Dr. {self.user.username} - {self.specialty}"
+
+
+class ReceptionistProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='receptionist_profile')
+    doctor = models.OneToOneField(DoctorProfile, on_delete=models.CASCADE, related_name='receptionist_profile')
+
+    def __str__(self):
+        return f"Receptionist: {self.user.username} for Dr. {self.doctor.user.username}"

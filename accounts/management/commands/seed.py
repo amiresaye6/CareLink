@@ -2,7 +2,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from datetime import timedelta, time, datetime
 
-# Import models across all apps (No Bonus Features)
+
 from accounts.models import User, PatientProfile, DoctorProfile
 from appointments.models import Appointment, WeeklySchedule, ScheduleException, AppointmentAuditTrail
 from medical.models import ConsultationRecord, PrescriptionItem, TestRequest

@@ -1,5 +1,6 @@
-from rest_framework.decorators import api_view ,permission_classes
+from rest_framework.decorators import APIView, api_view ,permission_classes
 from rest_framework.response import Response
+from accounts.apis.permissions import IsAdmin
 from accounts.models import User
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -78,3 +79,4 @@ def profile(request):
 def logout(request):
     request.user.auth_token.delete()
     return Response({'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
+

@@ -1,7 +1,8 @@
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.decorators import api_view
-
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from accounts.apis.permissions import IsAdmin, IsDoctor
 from django.shortcuts import get_object_or_404
 
 from accounts.models import DoctorProfile
@@ -15,6 +16,7 @@ from dashboard.api.doctor.serializers import (
 )
 
 
+
 def _get_logged_in_doctor(request):
     try:
         return request.user.doctor_profile
@@ -23,6 +25,7 @@ def _get_logged_in_doctor(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated , IsAdmin])
 def get_doctor_by_id(request, id):
     doctor = get_object_or_404(DoctorProfile, pk=id)
     doctor = DoctorProfileModelSerializer(doctor)
@@ -30,6 +33,7 @@ def get_doctor_by_id(request, id):
 
 
 @api_view(['PUT'])
+@permission_classes([IsAuthenticated , IsAdmin])
 def update_doctor_by_id(request, id):
     doctor = get_object_or_404(DoctorProfile, pk=id)
     doctor = DoctorProfileModelSerializer(doctor, data=request.data, partial=True)
@@ -40,6 +44,7 @@ def update_doctor_by_id(request, id):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated , IsDoctor])
 def get_logged_in_doctor(request):
     doctor = _get_logged_in_doctor(request)
     if not doctor:
@@ -49,6 +54,7 @@ def get_logged_in_doctor(request):
 
 
 @api_view(['PUT'])
+@permission_classes([IsAuthenticated , IsDoctor])
 def update_logged_in_doctor(request):
     doctor = _get_logged_in_doctor(request)
     if not doctor:
@@ -62,6 +68,7 @@ def update_logged_in_doctor(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated , IsDoctor])
 def get_logged_in_weekly_schedules(request):
     doctor = _get_logged_in_doctor(request)
     if not doctor:
@@ -72,6 +79,7 @@ def get_logged_in_weekly_schedules(request):
 
 
 @api_view(['PUT'])
+@permission_classes([IsAuthenticated , IsDoctor])
 def update_logged_in_weekly_schedule(request, id):
     doctor = _get_logged_in_doctor(request)
     if not doctor:
@@ -85,6 +93,7 @@ def update_logged_in_weekly_schedule(request, id):
 
 
 @api_view(['DELETE'])
+@permission_classes([IsAuthenticated , IsDoctor])
 def delete_logged_in_weekly_schedule(request, id):
     doctor = _get_logged_in_doctor(request)
     if not doctor:
@@ -95,6 +104,7 @@ def delete_logged_in_weekly_schedule(request, id):
 
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated , IsDoctor])
 def create_logged_in_weekly_schedule(request):
     doctor = _get_logged_in_doctor(request)
     if not doctor:
@@ -126,6 +136,7 @@ def create_logged_in_weekly_schedule(request):
 
 
 @api_view(['POST', 'PUT'])
+@permission_classes([IsAuthenticated , IsDoctor])
 def bulk_set_logged_in_weekly_schedules(request):
     doctor = _get_logged_in_doctor(request)
     if not doctor:
@@ -157,6 +168,7 @@ def bulk_set_logged_in_weekly_schedules(request):
 
 
 @api_view(['DELETE'])
+@permission_classes([IsAuthenticated , IsDoctor])
 def bulk_delete_logged_in_weekly_schedules(request):
     doctor = _get_logged_in_doctor(request)
     if not doctor:
@@ -177,6 +189,7 @@ def bulk_delete_logged_in_weekly_schedules(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated , IsDoctor])
 def get_logged_in_schedule_exceptions(request):
     doctor = _get_logged_in_doctor(request)
     if not doctor:
@@ -187,6 +200,7 @@ def get_logged_in_schedule_exceptions(request):
 
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated , IsDoctor])
 def create_logged_in_schedule_exception(request):
     doctor = _get_logged_in_doctor(request)
     if not doctor:
@@ -216,6 +230,7 @@ def create_logged_in_schedule_exception(request):
 
 
 @api_view(['PUT'])
+@permission_classes([IsAuthenticated , IsDoctor])
 def update_logged_in_schedule_exception(request, id):
     doctor = _get_logged_in_doctor(request)
     if not doctor:
@@ -229,6 +244,7 @@ def update_logged_in_schedule_exception(request, id):
 
 
 @api_view(['DELETE'])
+@permission_classes([IsAuthenticated , IsDoctor])
 def delete_logged_in_schedule_exception(request, id):
     doctor = _get_logged_in_doctor(request)
     if not doctor:

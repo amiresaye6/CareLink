@@ -11,6 +11,8 @@ from rest_framework.response import Response
 from accounts.models import DoctorProfile, PatientProfile
 from appointments.models import WeeklySchedule, ScheduleException, Appointment
 from appointments.api.serializers import DoctorAppointmentDetailsSerializer, BookAppointmentSerializer
+from rest_framework.permissions import IsAuthenticated , AllowAny
+from accounts.apis.permissions import IsPatient
 
 
 def _parse_int(value, default):
@@ -132,6 +134,7 @@ def _generate_available_slots(doctor, range_start, range_end):
 
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def doctor_appointment_details(request, id):
     doctor = get_object_or_404(DoctorProfile, pk=id)
 
@@ -168,6 +171,7 @@ def doctor_appointment_details(request, id):
 
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def book_appointment(request, doctor_id):
     patient = _get_logged_in_patient(request)
     if not patient:

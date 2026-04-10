@@ -1,0 +1,234 @@
+from datetime import datetime, timedelta
+
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+
+from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
+
+from accounts.models import DoctorProfile, PatientProfile
+from appointments.models import WeeklySchedule, ScheduleException, Appointment
+from appointments.api.serializers import DoctorAppointmentDetailsSerializer, BookAppointmentSerializer
+
+
+def _parse_int(value, default):
+    try:
+        return int(value)
+    except Exception:
+        return default
+
+
+def _date_range(now, request):
+    range_value = (request.query_params.get('range') or '').strip().lower()
+    if range_value == 'all':
+        days = 90
+    else:
+        days = 14
+
+    days = _parse_int(request.query_params.get('days'), days)
+    if days < 1:
+        days = 1
+    if days > 365:
+        days = 365
+
+    start = now
+    end = now + timedelta(days=days)
+    return start, end
+
+
+def _get_day_working_windows(doctor, day_date):
+    exc = ScheduleException.objects.filter(doctor=doctor, date=day_date).first()
+    if exc:
+        if exc.is_day_off:
+            return []
+        if exc.start_time and exc.end_time:
+            return [(exc.start_time, exc.end_time)]
+        return []
+
+    weekday = day_date.weekday()
+    windows = []
+    for ws in WeeklySchedule.objects.filter(doctor=doctor, day_of_week=weekday).order_by('start_time'):
+        windows.append((ws.start_time, ws.end_time))
+    return windows
+
+
+def _is_datetime_in_doctor_availability(doctor, dt):
+    day_date = timezone.localdate(dt)
+    windows = _get_day_working_windows(doctor, day_date)
+    if not windows:
+        return False
+
+    local_dt = timezone.localtime(dt)
+    t = local_dt.time()
+    duration_min = int(doctor.session_duration or 30)
+    end_t = (local_dt + timedelta(minutes=duration_min)).time()
+
+    for start_t, end_t_window in windows:
+        if start_t <= t and end_t <= end_t_window:
+            return True
+    return False
+
+
+def _get_logged_in_patient(request):
+    try:
+        if getattr(request.user, 'role', None) != 'PATIENT':
+            return None
+        return request.user.patient_profile
+    except Exception:
+        return None
+
+
+def _parse_date(value):
+    try:
+        return datetime.strptime(value, '%Y-%m-%d').date()
+    except Exception:
+        return None
+
+
+def _day_bounds(day_date):
+    tz = timezone.get_current_timezone()
+    start = timezone.make_aware(datetime.combine(day_date, datetime.min.time()), tz)
+    end = timezone.make_aware(datetime.combine(day_date, datetime.max.time()), tz)
+    return start, end
+
+
+def _generate_available_slots(doctor, range_start, range_end):
+    booked = set(
+        Appointment.objects.filter(
+            doctor=doctor,
+            scheduled_datetime__gte=range_start,
+            scheduled_datetime__lte=range_end,
+        )
+        .exclude(status='CANCELLED')
+        .values_list('scheduled_datetime', flat=True)
+    )
+
+    duration_min = int(doctor.session_duration or 30)
+    buffer_min = int(doctor.buffer_time or 0)
+    step_min = max(1, duration_min + buffer_min)
+
+    slots = []
+    current_day = timezone.localdate(range_start)
+    end_day = timezone.localdate(range_end)
+    tz = timezone.get_current_timezone()
+
+    while current_day <= end_day:
+        for start_t, end_t in _get_day_working_windows(doctor, current_day):
+            day_start = timezone.make_aware(datetime.combine(current_day, start_t), tz)
+            day_end = timezone.make_aware(datetime.combine(current_day, end_t), tz)
+
+            cursor = day_start
+            while cursor + timedelta(minutes=duration_min) <= day_end:
+                if cursor >= range_start and cursor <= range_end and cursor > timezone.now():
+                    if cursor not in booked:
+                        slots.append(cursor)
+                cursor = cursor + timedelta(minutes=step_min)
+
+        current_day = current_day + timedelta(days=1)
+
+    return slots
+
+
+@api_view(['GET'])
+def doctor_appointment_details(request, id):
+    doctor = get_object_or_404(DoctorProfile, pk=id)
+
+    now = timezone.now()
+
+    selected_date = None
+    date_q = (request.query_params.get('date') or '').strip()
+    if date_q:
+        selected_date = _parse_date(date_q)
+        if not selected_date:
+            return Response({'message': 'not valid', 'errors': {'date': ['Use YYYY-MM-DD']}}, status=status.HTTP_400_BAD_REQUEST)
+        if selected_date < timezone.localdate(now):
+            return Response({'message': 'not valid', 'errors': {'date': ['Date must be in the future']}}, status=status.HTTP_400_BAD_REQUEST)
+        range_start, range_end = _day_bounds(selected_date)
+    else:
+        range_start, range_end = _date_range(now, request)
+
+    available_slots = _generate_available_slots(doctor, range_start, range_end)
+
+    data = {
+        'doctor': doctor,
+        'weekly_schedules': WeeklySchedule.objects.filter(doctor=doctor).order_by('day_of_week', 'start_time'),
+        'schedule_exceptions': ScheduleException.objects.filter(doctor=doctor, date__gte=timezone.localdate(now)).order_by('date'),
+        'range_start': range_start,
+        'range_end': range_end,
+        'selected_date': selected_date,
+        'available_slots': available_slots,
+        'session_duration': int(doctor.session_duration or 30),
+        'buffer_time': int(doctor.buffer_time or 0),
+    }
+
+    serializer = DoctorAppointmentDetailsSerializer(instance=data)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+def book_appointment(request, doctor_id):
+    patient = _get_logged_in_patient(request)
+    if not patient:
+        return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
+
+    ser = BookAppointmentSerializer(data=request.data)
+    if not ser.is_valid():
+        return Response({'message': 'not valid', 'errors': ser.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    doctor = get_object_or_404(DoctorProfile, pk=doctor_id)
+    scheduled_dt = ser.validated_data['scheduled_datetime']
+    is_telemedicine = ser.validated_data.get('is_telemedicine', False)
+
+    if timezone.is_naive(scheduled_dt):
+        scheduled_dt = timezone.make_aware(scheduled_dt, timezone.get_current_timezone())
+
+    if scheduled_dt <= timezone.now():
+        return Response({'message': 'not valid', 'errors': {'scheduled_datetime': ['Must be in the future']}}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not _is_datetime_in_doctor_availability(doctor, scheduled_dt):
+        return Response({'message': 'not valid', 'errors': {'scheduled_datetime': ['Not in doctor availability']}}, status=status.HTTP_400_BAD_REQUEST)
+
+    duration_min = int(doctor.session_duration or 30)
+    end_dt = scheduled_dt + timedelta(minutes=duration_min)
+
+    with transaction.atomic():
+        overlap = Appointment.objects.filter(
+            patient=patient,
+            scheduled_datetime__lt=end_dt,
+            scheduled_datetime__gt=scheduled_dt - timedelta(minutes=duration_min),
+        ).exclude(status='CANCELLED').exists()
+        if overlap:
+            return Response({'message': 'not valid', 'errors': {'scheduled_datetime': ['Patient has overlapping appointment']}}, status=status.HTTP_400_BAD_REQUEST)
+
+     
+        if Appointment.objects.filter(doctor=doctor, scheduled_datetime=scheduled_dt).exclude(status='CANCELLED').exists():
+            return Response({'message': 'not valid', 'errors': {'scheduled_datetime': ['Slot already booked']}}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            appt = Appointment.objects.create(
+                patient=patient,
+                doctor=doctor,
+                scheduled_datetime=scheduled_dt,
+                status='REQUESTED',
+                is_telemedicine=is_telemedicine,
+            )
+        except Exception:
+            return Response({'message': 'not valid', 'errors': {'scheduled_datetime': ['Slot already booked']}}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response(
+        {
+            'message': 'appointment requested!',
+            'appointment': {
+                'id': appt.id,
+                'doctor_id': doctor.id,
+                'patient_id': patient.id,
+                'scheduled_datetime': appt.scheduled_datetime,
+                'status': appt.status,
+                'is_telemedicine': appt.is_telemedicine,
+                'meeting_link': appt.meeting_link,
+            },
+        },
+        status=status.HTTP_201_CREATED,
+    )

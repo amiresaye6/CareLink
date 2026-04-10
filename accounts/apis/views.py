@@ -1,7 +1,7 @@
 from rest_framework.decorators import APIView, api_view ,permission_classes
 from rest_framework.response import Response
 from accounts.apis.permissions import IsAdmin , IsDoctor , IsPatient ,IsReceptionist
-from accounts.models import DoctorProfile, User
+from accounts.models import DoctorProfile, User , ReceptionistProfile ,PatientProfile
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
@@ -107,6 +107,21 @@ def list_InActiveUsers(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAdmin])
+def list_ActivePatients(request):
+    users = PatientProfile.objects.filter(user__is_active=1)
+    serializer = PatientProfileSerializer(users , many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAdmin])
+def list_ActiveReceptionists(request):
+    users = ReceptionistProfile.objects.filter(user__is_active=1)
+    serializer = ReceptionistProfileSerializer(users , many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_ActiveDoctors(request):
     users = DoctorProfile.objects.filter(user__is_active=1)
@@ -121,4 +136,5 @@ def list_ActiveDoctorsBySpeciality(request):
     users = DoctorProfile.objects.filter( user__is_active=1 , specialty=doc_speciality)
     serializer = DoctorProfileSerializer(users , many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
 

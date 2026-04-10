@@ -11,6 +11,10 @@ from dashboard.api.doctor.views import (
     delete_logged_in_weekly_schedule,
     bulk_set_logged_in_weekly_schedules,
     bulk_delete_logged_in_weekly_schedules,
+    get_logged_in_schedule_exceptions,
+    create_logged_in_schedule_exception,
+    update_logged_in_schedule_exception,
+    delete_logged_in_schedule_exception,
 )
 
 
@@ -26,4 +30,10 @@ urlpatterns = [
     path('weekly-schedules/create', create_logged_in_weekly_schedule, name='dashboard.api.doctor.create_logged_in_weekly_schedule'),
     path('weekly-schedules/update/<int:id>', update_logged_in_weekly_schedule, name='dashboard.api.doctor.update_logged_in_weekly_schedule'),
     path('weekly-schedules/delete/<int:id>', delete_logged_in_weekly_schedule, name='dashboard.api.doctor.delete_logged_in_weekly_schedule'),
+
+
+    path('schedule-exceptions', get_logged_in_schedule_exceptions, name='dashboard.api.doctor.get_logged_in_schedule_exceptions'),
+    path('schedule-exceptions/create', create_logged_in_schedule_exception, name='dashboard.api.doctor.create_logged_in_schedule_exception'),
+    path('schedule-exceptions/update/<int:id>', update_logged_in_schedule_exception, name='dashboard.api.doctor.update_logged_in_schedule_exception'),
+    path('schedule-exceptions/delete/<int:id>', delete_logged_in_schedule_exception, name='dashboard.api.doctor.delete_logged_in_schedule_exception'),
 ]

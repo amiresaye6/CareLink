@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from accounts.models import DoctorProfile
-from appointments.models import WeeklySchedule
+from appointments.models import WeeklySchedule, ScheduleException
 
 
 class DoctorProfileModelSerializer(serializers.ModelSerializer):
@@ -60,3 +60,23 @@ class WeeklyScheduleModelSerializer(serializers.ModelSerializer):
         instance.delete()
         return instance
 
+
+
+
+
+class ScheduleExceptionModelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ScheduleException
+        fields = '__all__'
+        read_only_fields = ('id', 'doctor')
+
+    def create(self, validated_data):
+        return ScheduleException.objects.create(**validated_data)
+
+    def update(self, instance, validated_data):
+        instance.date = validated_data.get('date', instance.date)
+        instance.is_day_off = validated_data.get('is_day_off', instance.is_day_off)
+        instance.start_time = validated_data.get('start_time', instance.start_time)
+        instance.end_time = validated_data.get('end_time', instance.end_time)
+        instance.save()
+        return instance

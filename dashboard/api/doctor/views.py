@@ -5,12 +5,13 @@ from rest_framework.decorators import api_view
 from django.shortcuts import get_object_or_404
 
 from accounts.models import DoctorProfile
-from appointments.models import WeeklySchedule
+from appointments.models import WeeklySchedule, ScheduleException
 from dashboard.api.doctor.serializers import (
     DoctorProfileModelSerializer,
     WeeklyScheduleModelSerializer,
     WeeklyScheduleBulkSetSerializer,
     WEEKLY_DAYS_EXCEPT_FRIDAY,
+    ScheduleExceptionModelSerializer,
 )
 
 
@@ -170,3 +171,69 @@ def bulk_delete_logged_in_weekly_schedules(request):
         {'message': 'object deleted!', 'deleted_count': deleted_count},
         status=status.HTTP_200_OK,
     )
+
+
+
+
+
+@api_view(['GET'])
+def get_logged_in_schedule_exceptions(request):
+    doctor = _get_logged_in_doctor(request)
+    if not doctor:
+        return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
+    exc = ScheduleException.objects.filter(doctor=doctor).order_by('date')
+    exc = ScheduleExceptionModelSerializer(exc, many=True)
+    return Response(exc.data)
+
+
+@api_view(['POST'])
+def create_logged_in_schedule_exception(request):
+    doctor = _get_logged_in_doctor(request)
+    if not doctor:
+        return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
+    exc = ScheduleExceptionModelSerializer(data=request.data)
+    if not exc.is_valid():
+        return Response({'message': 'not valid', 'errors': exc.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    vd = exc.validated_data
+    date_val = vd.get('date')
+    if date_val is None:
+        return Response(
+            {'message': 'not valid', 'errors': {'date': ['This field is required.']}},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    existing = ScheduleException.objects.filter(doctor=doctor, date=date_val).first()
+    if existing:
+        exc = ScheduleExceptionModelSerializer(existing, data=request.data, partial=True)
+        if not exc.is_valid():
+            return Response({'message': 'not valid', 'errors': exc.errors}, status=status.HTTP_400_BAD_REQUEST)
+        exc.save()
+        return Response({'message': 'object updated!', 'exception': exc.data}, status=status.HTTP_200_OK)
+
+    exc.save(doctor=doctor)
+    return Response({'message': 'object created!', 'exception': exc.data}, status=status.HTTP_201_CREATED)
+
+
+@api_view(['PUT'])
+def update_logged_in_schedule_exception(request, id):
+    doctor = _get_logged_in_doctor(request)
+    if not doctor:
+        return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
+    exc = get_object_or_404(ScheduleException, pk=id, doctor=doctor)
+    exc = ScheduleExceptionModelSerializer(exc, data=request.data, partial=True)
+    if exc.is_valid():
+        exc.save()
+        return Response({'message': 'object updated!', 'exception': exc.data}, status=status.HTTP_200_OK)
+    return Response({'message': 'not valid', 'errors': exc.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+def delete_logged_in_schedule_exception(request, id):
+    doctor = _get_logged_in_doctor(request)
+    if not doctor:
+        return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
+    exc = get_object_or_404(ScheduleException, pk=id, doctor=doctor)
+    exc.delete()
+    return Response({'message': 'object deleted!'}, status=status.HTTP_200_OK)
+

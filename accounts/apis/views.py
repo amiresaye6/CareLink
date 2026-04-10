@@ -121,6 +121,7 @@ def list_ActiveReceptionists(request):
     serializer = ReceptionistProfileSerializer(users , many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_ActiveDoctors(request):
@@ -136,5 +137,7 @@ def list_ActiveDoctorsBySpeciality(request):
     users = DoctorProfile.objects.filter( user__is_active=1 , specialty=doc_speciality)
     serializer = DoctorProfileSerializer(users , many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+
 
 

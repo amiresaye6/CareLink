@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ConsultationRecord, PrescriptionItem, TestRequest
+from ..models import ConsultationRecord, PrescriptionItem, TestRequest
 
 class PrescriptionItemSerializer(serializers.ModelSerializer):
     class Meta:

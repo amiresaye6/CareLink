@@ -5,6 +5,8 @@ from django.contrib.auth.models import Group
 
 
 class SignUpDoctorSerializer(serializers.Serializer):
+    first_name = serializers.CharField(required=True, max_length=150)
+    last_name = serializers.CharField(required=True, max_length=150)
     username = serializers.CharField(required=True, max_length=150)
     email = serializers.EmailField(required=True, max_length=254)
     password = serializers.CharField(write_only=True, required=True, min_length=8)
@@ -15,6 +17,8 @@ class SignUpDoctorSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         user = User.objects.create_user(
+            first_name=validated_data['first_name'],
+            last_name=validated_data['last_name'],
             username=validated_data['username'],
             email=validated_data['email'],
             password=validated_data['password'],
@@ -36,6 +40,8 @@ class SignUpDoctorSerializer(serializers.Serializer):
 
 
 class SignUpPatientSerializer(serializers.Serializer):
+    first_name = serializers.CharField(required=True, max_length=150)
+    last_name = serializers.CharField(required=True, max_length=150)
     username = serializers.CharField(required=True, max_length=150)
     email = serializers.EmailField(required=True, max_length=254)
     password = serializers.CharField(write_only=True, required=True, min_length=8)
@@ -45,6 +51,8 @@ class SignUpPatientSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         user = User.objects.create_user(
+            first_name=validated_data['first_name'],
+            last_name=validated_data['last_name'],
             username=validated_data['username'],
             email=validated_data['email'],
             password=validated_data['password'],
@@ -66,6 +74,8 @@ class SignUpPatientSerializer(serializers.Serializer):
 
 
 class SignUpReceptionistSerializer(serializers.Serializer):
+    first_name = serializers.CharField(required=True, max_length=150)
+    last_name = serializers.CharField(required=True, max_length=150)
     username = serializers.CharField(required=True, max_length=150)
     email = serializers.EmailField(required=True, max_length=254)
     password = serializers.CharField(write_only=True, required=True, min_length=8)
@@ -78,6 +88,8 @@ class SignUpReceptionistSerializer(serializers.Serializer):
             raise serializers.ValidationError({"doctor_id": "Doctor not found."})
 
         user = User.objects.create_user(
+            first_name=validated_data['first_name'],
+            last_name=validated_data['last_name'],
             username=validated_data['username'],
             email=validated_data['email'],
             password=validated_data['password'],
@@ -99,11 +111,13 @@ class SignUpReceptionistSerializer(serializers.Serializer):
 class SignUpAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['username', 'email', 'password', 'role']
+        fields = ['first_name', 'last_name', 'username', 'email', 'password', 'role']
         extra_kwargs = {'password': {'write_only': True}}
 
     def create(self, validated_data):
         CreatedUser = User.objects.create_user(
+            first_name=validated_data.get('first_name', ''),
+            last_name=validated_data.get('last_name', ''),
             username=validated_data['username'],
             email=validated_data['email'],
             password=validated_data['password'],
@@ -121,9 +135,11 @@ class SignUpAdminSerializer(serializers.ModelSerializer):
 class SignUpUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['username', 'email', 'password', 'role']
+        fields = ['first_name', 'last_name', 'username', 'email', 'password', 'role']
         extra_kwargs = {'password': {'write_only': True}}
 
+    first_name = serializers.CharField(required=True, max_length=150)
+    last_name = serializers.CharField(required=True, max_length=150)
     username = serializers.CharField(required=True, max_length=150)
     email = serializers.EmailField(required=True, max_length=254)
     password = serializers.CharField(write_only=True, required=True, min_length=8)
@@ -140,28 +156,34 @@ class SignUpUserSerializer(serializers.ModelSerializer):
 
 
 class DoctorProfileSerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField(source='user.first_name', read_only=True)
+    last_name = serializers.CharField(source='user.last_name', read_only=True)
     username = serializers.CharField(source='user.username', read_only=True)
     email = serializers.EmailField(source='user.email', read_only=True)
     role = serializers.CharField(source='user.role', read_only=True)
 
     class Meta:
         model = DoctorProfile
-        fields = ['id', 'username', 'email', 'role', 'specialty', 'session_duration', 'buffer_time']
+        fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role', 'specialty', 'session_duration', 'buffer_time']
 
 
 
 class PatientProfileSerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField(source='user.first_name', read_only=True)
+    last_name = serializers.CharField(source='user.last_name', read_only=True)
     username = serializers.CharField(source='user.username', read_only=True)
     email = serializers.EmailField(source='user.email', read_only=True)
     role = serializers.CharField(source='user.role', read_only=True)
 
     class Meta:
         model = PatientProfile
-        fields = ['id', 'username', 'email', 'role', 'date_of_birth', 'phone_number', 'medical_history']
+        fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role', 'date_of_birth', 'phone_number', 'medical_history']
 
 
 
 class ReceptionistProfileSerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField(source='user.first_name', read_only=True)
+    last_name = serializers.CharField(source='user.last_name', read_only=True)
     username = serializers.CharField(source='user.username', read_only=True)
     email = serializers.EmailField(source='user.email', read_only=True)
     role = serializers.CharField(source='user.role', read_only=True)
@@ -169,7 +191,7 @@ class ReceptionistProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ReceptionistProfile
-        fields = ['id', 'username', 'email', 'role', 'doctor', 'doctor_name']
+        fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role', 'doctor', 'doctor_name']
 
 
 
@@ -180,10 +202,10 @@ class AdminProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'role']
+        fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role']
 
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'role','is_active', 'date_joined']
+        fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role','is_active', 'date_joined']

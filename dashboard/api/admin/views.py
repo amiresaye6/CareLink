@@ -21,7 +21,7 @@ class UserViewSet(viewsets.ModelViewSet):
         - ?role=DOCTOR                      -> Filter by role
         - ?is_active=true                   -> Filter by active status
         - ?search=ahmed                     -> Search by username/email/name
-        - ?page=2                           -> Pagination (DRF handles this)
+        - ?page=2                           -> Pagination
         - Combine: ?role=DOCTOR&is_active=true&search=ahmed&page=1
     """
     

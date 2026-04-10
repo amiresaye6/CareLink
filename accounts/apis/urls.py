@@ -3,7 +3,7 @@ from accounts import views
 from .views import list_ActiveDoctorsBySpeciality,list_ActiveDoctors, list_InActiveUsers,list_ActiveUsers, signup , profile , logout , list_users
 from rest_framework.authtoken.views import obtain_auth_token
 
-#api/accounts/
+
 urlpatterns = [
     path('signup/', signup, name='signup'),
     path('profile/', profile, name='profile'),

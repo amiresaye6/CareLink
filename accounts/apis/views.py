@@ -1,11 +1,11 @@
 from rest_framework.decorators import APIView, api_view ,permission_classes
 from rest_framework.response import Response
 from accounts.apis.permissions import IsAdmin
-from accounts.models import User
+from accounts.models import DoctorProfile, User
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
-from .serializers import SignUpAdminSerializer, SignUpDoctorSerializer , SignUpPatientSerializer, SignUpReceptionistSerializer, SignUpUserSerializer
+from .serializers import SignUpAdminSerializer, SignUpDoctorSerializer , SignUpPatientSerializer, SignUpReceptionistSerializer, SignUpUserSerializer, UserSerializer
 from .serializers import DoctorProfileSerializer, PatientProfileSerializer, ReceptionistProfileSerializer, AdminProfileSerializer
 
 @api_view(['POST'])
@@ -79,4 +79,46 @@ def profile(request):
 def logout(request):
     request.user.auth_token.delete()
     return Response({'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAdmin])
+def list_users(request):
+    users = User.objects.all()
+    serializer = UserSerializer(users, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAdmin])
+def list_ActiveUsers(request):
+    users = User.objects.filter(is_active=1)
+    serializer = UserSerializer(users , many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAdmin])
+def list_InActiveUsers(request):
+    users = User.objects.filter(is_active=0)
+    serializer = UserSerializer(users , many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_ActiveDoctors(request):
+    users = DoctorProfile.objects.filter(user__is_active=1)
+    serializer = DoctorProfileSerializer(users , many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_ActiveDoctorsBySpeciality(request):
+    doc_speciality = request.query_params.get('speciality')
+    users = DoctorProfile.objects.filter( user__is_active=1 , specialty=doc_speciality)
+    serializer = DoctorProfileSerializer(users , many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
 

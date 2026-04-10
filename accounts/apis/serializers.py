@@ -96,7 +96,7 @@ class SignUpReceptionistSerializer(serializers.Serializer):
 
 
 
-class SignUpAdminSerializer(serializers.Serializer):
+class SignUpAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['username', 'email', 'password', 'role']
@@ -181,3 +181,9 @@ class AdminProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'role']
+
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'role','is_active', 'date_joined']

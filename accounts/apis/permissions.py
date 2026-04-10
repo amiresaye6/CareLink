@@ -12,10 +12,10 @@ class IsDoctor(BasePermission):
 
 class IsReceptionist(BasePermission):
     def has_permission(self, request, view):
-        return (request.user and request.user.is_authenticated and request.user.role=="RECEPTIONIST")
+        return bool(request.user and request.user.is_authenticated and request.user.role=="RECEPTIONIST")
     
-    
+
 class IsAdmin(BasePermission):
     def has_permission(self, request, view):
-        return (request.user and request.user.is_authenticated and request.user.role=="ADMIN")
+        return bool(request.user and request.user.is_authenticated and request.user.role=="ADMIN")
     

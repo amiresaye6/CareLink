@@ -27,7 +27,7 @@ class Command(BaseCommand):
             return timezone.make_aware(datetime.combine(target_date, time(hour, minute)))
 
         # 3. Create Users
-        admin_user = User.objects.create_superuser(username='amir_admin', email='amir@clinic.com', password='password123', role='ADMIN')
+        # admin_user = User.objects.create_superuser(username='amir_admin', email='amir@clinic.com', password='password123', role='ADMIN')
         doc_donia = User.objects.create_user(username='donia_doc', email='donia@clinic.com', password='password123', role='DOCTOR')
         doc_mohamed = User.objects.create_user(username='mohamed_doc', email='mohamed@clinic.com', password='password123', role='DOCTOR')
         

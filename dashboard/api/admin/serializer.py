@@ -112,3 +112,26 @@ class UserListSerializer(serializers.ModelSerializer):
     
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}"
+
+class UserUpdateSerializer(serializers.ModelSerializer):
+    """Serializer for updating user (activate/deactivate)"""
+    
+    role_display = serializers.CharField(
+        source='get_role_display',
+        read_only=True
+    )
+    
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'username',
+            'email',
+            'first_name',
+            'last_name',
+            'role',
+            'role_display',
+            'is_active',
+            'date_joined',
+        ]
+        read_only_fields = ['id', 'username', 'role', 'date_joined']

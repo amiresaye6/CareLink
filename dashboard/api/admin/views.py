@@ -6,7 +6,8 @@ from django.db.models import Q
 from accounts.models import User
 from .serializer import (
     UserListSerializer,
-    UserDetailsSerializer
+    UserDetailsSerializer,
+    UserUpdateSerializer
 )
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -16,6 +17,7 @@ class UserViewSet(viewsets.ModelViewSet):
      Endpoints:
         - GET /api/users/                   -> List all users (paginated, filterable)
         - GET /api/users/{id}/              -> Get single user with all details
+        - PATCH /api/users/{id}/            -> Update user (activate/deactivate)
     
     Query Parameters:
         - ?role=DOCTOR                      -> Filter by role
@@ -39,6 +41,8 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         if self.action == 'list':
             return UserListSerializer
+        elif self.action in ['update', 'partial_update']:
+            return UserUpdateSerializer
         else:
             return UserDetailsSerializer
 

@@ -7,4 +7,5 @@ router.register(r'users', UserViewSet, basename='user')
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('doctor/', include('dashboard.api.doctor.urls')),
 ]

@@ -3,7 +3,7 @@ from django.utils import timezone
 from datetime import timedelta, time, datetime
 
 # Import models across all apps (No Bonus Features)
-from accounts.models import User, PatientProfile, DoctorProfile
+from accounts.models import User, PatientProfile, DoctorProfile, ReceptionistProfile
 from appointments.models import Appointment, WeeklySchedule, ScheduleException, AppointmentAuditTrail
 from medical.models import ConsultationRecord, PrescriptionItem, TestRequest
 
@@ -30,22 +30,28 @@ class Command(BaseCommand):
         admin_user = User.objects.create_superuser(username='amir_admin', email='amir@clinic.com', password='password123', role='ADMIN')
         doc_donia = User.objects.create_user(username='donia_doc', email='donia@clinic.com', password='password123', role='DOCTOR')
         doc_mohamed = User.objects.create_user(username='mohamed_doc', email='mohamed@clinic.com', password='password123', role='DOCTOR')
-        rec_hager = User.objects.create_user(username='hager_rec', email='hager@clinic.com', password='password123', role='RECEPTIONIST')
         
-        # We need multiple patients to test queues
+        # Receptionists
+        rec_hager = User.objects.create_user(username='hager_rec', email='hager@clinic.com', password='password123', role='RECEPTIONIST')
+        rec_ahmed = User.objects.create_user(username='ahmed_rec', email='ahmed@clinic.com', password='password123', role='RECEPTIONIST')
+        
+        # Patients
         pat_amir_m = User.objects.create_user(username='amir_maula', email='amir.m@email.com', password='password123', role='PATIENT')
         pat_sara = User.objects.create_user(username='sara_smith', email='sara@email.com', password='password123', role='PATIENT')
         pat_khaled = User.objects.create_user(username='khaled_omar', email='khaled@email.com', password='password123', role='PATIENT')
 
         # 4. Create Profiles
-        prof_donia = DoctorProfile.objects.create(user=doc_donia, specialty='Cardiology', session_duration=30)
-        prof_mohamed = DoctorProfile.objects.create(user=doc_mohamed, specialty='General Practice', session_duration=15)
+        prof_donia = DoctorProfile.objects.create(user=doc_donia, specialty='CARDIOLOGY', session_duration=30, buffer_time=5)
+        prof_mohamed = DoctorProfile.objects.create(user=doc_mohamed, specialty='GENERAL', session_duration=15, buffer_time=5)
         
         prof_amir_m = PatientProfile.objects.create(user=pat_amir_m, date_of_birth='1995-08-15', phone_number='01011111111', medical_history='Mild asthma.')
         prof_sara = PatientProfile.objects.create(user=pat_sara, date_of_birth='1990-02-20', phone_number='01022222222')
         prof_khaled = PatientProfile.objects.create(user=pat_khaled, date_of_birth='1985-11-05', phone_number='01033333333', medical_history='Hypertension')
 
-        # 5. Create Schedules & Exceptions
+        ReceptionistProfile.objects.create(user=rec_hager, doctor=prof_donia)
+        ReceptionistProfile.objects.create(user=rec_ahmed, doctor=prof_mohamed)
+
+        # 5. Create Schedules & Exceptions 
         # Donia works Monday(0) to Wednesday(2)
         for day in range(3):
             WeeklySchedule.objects.create(doctor=prof_donia, day_of_week=day, start_time=time(9, 0), end_time=time(17, 0))
@@ -96,7 +102,7 @@ class Command(BaseCommand):
             reason="Patient called, stuck in traffic. Rescheduled to noon slot."
         )
 
-        # 8. EMR Data (For the completed past appointment)
+        # 8. EMR Data (For the completed past appointment) 
         consultation = ConsultationRecord.objects.create(
             appointment=app_past, diagnosis='Acute Bronchitis', 
             clinical_notes='Patient presented with mild cough and shortness of breath. Chest clear on auscultation.'

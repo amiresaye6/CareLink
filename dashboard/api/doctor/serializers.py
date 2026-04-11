@@ -1,6 +1,9 @@
+from django.utils import timezone
 from rest_framework import serializers
-from accounts.models import DoctorProfile
-from appointments.models import WeeklySchedule, ScheduleException
+
+from accounts.models import DoctorProfile, PatientProfile
+from appointments.models import WeeklySchedule, ScheduleException, Appointment
+from medical.models import ConsultationRecord, PrescriptionItem, TestRequest
 
 
 class DoctorProfileModelSerializer(serializers.ModelSerializer):
@@ -80,3 +83,154 @@ class ScheduleExceptionModelSerializer(serializers.ModelSerializer):
         instance.end_time = validated_data.get('end_time', instance.end_time)
         instance.save()
         return instance
+
+
+class PrescriptionItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PrescriptionItem
+        fields = ['id', 'drug_name', 'dose', 'duration_days']
+
+
+class TestRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TestRequest
+        fields = ['id', 'test_name']
+
+
+class ConsultationForDoctorPatientSerializer(serializers.ModelSerializer):
+    prescriptions = PrescriptionItemSerializer(many=True, read_only=True)
+    tests = TestRequestSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ConsultationRecord
+        fields = ['id', 'diagnosis', 'clinical_notes', 'created_at', 'prescriptions', 'tests']
+
+
+class DoctorPatientAppointmentSerializer(serializers.ModelSerializer):
+    consultation = ConsultationForDoctorPatientSerializer(read_only=True)
+
+    class Meta:
+        model = Appointment
+        fields = [
+            'id',
+            'scheduled_datetime',
+            'status',
+            'is_telemedicine',
+            'meeting_link',
+            'check_in_time',
+            'consultation',
+        ]
+
+
+class DoctorPatientListSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    email = serializers.EmailField(source='user.email', read_only=True)
+    appointments_count = serializers.SerializerMethodField()
+    last_appointment_at = serializers.SerializerMethodField()
+    next_appointment_at = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PatientProfile
+        fields = [
+            'id',
+            'username',
+            'email',
+            'date_of_birth',
+            'phone_number',
+            'appointments_count',
+            'last_appointment_at',
+            'next_appointment_at',
+        ]
+
+    def _doctor_qs(self, obj):
+        doctor = self.context.get('doctor')
+        if not doctor:
+            return obj.appointments.none()
+        return obj.appointments.filter(doctor=doctor)
+
+    def get_appointments_count(self, obj):
+        return self._doctor_qs(obj).count()
+
+    def get_last_appointment_at(self, obj):
+        now = timezone.now()
+        ap = (
+            self._doctor_qs(obj)
+            .filter(scheduled_datetime__lt=now)
+            .order_by('-scheduled_datetime')
+            .first()
+        )
+        return ap.scheduled_datetime if ap else None
+
+    def get_next_appointment_at(self, obj):
+        now = timezone.now()
+        ap = (
+            self._doctor_qs(obj)
+            .filter(scheduled_datetime__gte=now)
+            .exclude(status='CANCELLED')
+            .order_by('scheduled_datetime')
+            .first()
+        )
+        return ap.scheduled_datetime if ap else None
+
+
+class DoctorPatientDetailSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    email = serializers.EmailField(source='user.email', read_only=True)
+    role = serializers.CharField(source='user.role', read_only=True)
+    last_appointment_at = serializers.SerializerMethodField()
+    next_appointment_at = serializers.SerializerMethodField()
+    appointments = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PatientProfile
+        fields = [
+            'id',
+            'username',
+            'email',
+            'role',
+            'date_of_birth',
+            'phone_number',
+            'medical_history',
+            'last_appointment_at',
+            'next_appointment_at',
+            'appointments',
+        ]
+
+    def _doctor_appt_qs(self, obj):
+        doctor = self.context.get('doctor')
+        if not doctor:
+            return obj.appointments.none()
+        return obj.appointments.filter(doctor=doctor)
+
+    def get_last_appointment_at(self, obj):
+        now = timezone.now()
+        ap = (
+            self._doctor_appt_qs(obj)
+            .filter(scheduled_datetime__lt=now)
+            .order_by('-scheduled_datetime')
+            .first()
+        )
+        return ap.scheduled_datetime if ap else None
+
+    def get_next_appointment_at(self, obj):
+        now = timezone.now()
+        ap = (
+            self._doctor_appt_qs(obj)
+            .filter(scheduled_datetime__gte=now)
+            .exclude(status='CANCELLED')
+            .order_by('scheduled_datetime')
+            .first()
+        )
+        return ap.scheduled_datetime if ap else None
+
+    def get_appointments(self, obj):
+        doctor = self.context.get('doctor')
+        if not doctor:
+            return []
+        qs = (
+            obj.appointments.filter(doctor=doctor)
+            .select_related('consultation')
+            .prefetch_related('consultation__prescriptions', 'consultation__tests')
+            .order_by('-scheduled_datetime')
+        )
+        return DoctorPatientAppointmentSerializer(qs, many=True).data

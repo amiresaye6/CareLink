@@ -4,9 +4,9 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from accounts.apis.permissions import IsAdmin, IsDoctor
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from django.db.models import Q
+from django.db.models import Q, Count, Min
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -408,6 +408,14 @@ def get_logged_in_doctor_appointments(request):
     if not doctor:
         return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
 
+    doc_param = (request.query_params.get('doctor') or '').strip()
+    if doc_param:
+        try:
+            if int(doc_param) != doctor.id:
+                return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
+        except ValueError:
+            return Response({'message': 'not valid', 'errors': {'doctor': ['Invalid doctor id']}}, status=status.HTTP_400_BAD_REQUEST)
+
     qs = Appointment.objects.filter(doctor=doctor).select_related('patient', 'patient__user')
 
     status_param = (request.query_params.get('status') or request.query_params.get('appointment_status') or '').strip()
@@ -487,7 +495,7 @@ def get_logged_in_doctor_appointment_detail(request, appointment_id):
     return Response({'appointment': data}, status=status.HTTP_200_OK)
 
 
-@api_view(['PUT'])
+@api_view(['PUT', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def update_logged_in_doctor_appointment_status(request, appointment_id):
     doctor = _get_logged_in_doctor(request)
@@ -510,9 +518,9 @@ def update_logged_in_doctor_appointment_status(request, appointment_id):
         )
 
     if current == 'REQUESTED':
-        if new_status != 'CONFIRMED':
+        if new_status not in ('CONFIRMED', 'CANCELLED'):
             return Response(
-                {'message': 'not valid', 'errors': {'status': ['From REQUESTED you can only set CONFIRMED']}},
+                {'message': 'not valid', 'errors': {'status': ['From REQUESTED you can only set CONFIRMED or CANCELLED']}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
     elif current == 'CONFIRMED':
@@ -572,4 +580,176 @@ def delete_logged_in_doctor_appointment(request, appointment_id):
         )
     appt.delete()
     return Response({'message': 'object deleted!'}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsDoctor])
+def doctor_dashboard_stats(request):
+    doctor = _get_logged_in_doctor(request)
+    if not doctor:
+        return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
+
+    today = timezone.localdate()
+    first_of_month = today.replace(day=1)
+
+    base = Appointment.objects.filter(doctor=doctor)
+    total_appointments = base.count()
+    appointments_new_this_month = base.filter(scheduled_datetime__date__gte=first_of_month).count()
+
+    patient_qs = base.values('patient_id').distinct()
+    total_patients = patient_qs.count()
+
+    first_appts = (
+        Appointment.objects.filter(doctor=doctor)
+        .values('patient_id')
+        .annotate(first_dt=Min('scheduled_datetime'))
+    )
+    patients_new_this_month = sum(
+        1 for row in first_appts if row['first_dt'] and timezone.localdate(row['first_dt']) >= first_of_month
+    )
+
+    completed_total = base.filter(status='COMPLETED').count()
+    completed_today = base.filter(status='COMPLETED', scheduled_datetime__date=today).count()
+
+    no_show_total = base.filter(status='NO_SHOW').count()
+    denom = base.exclude(status='CANCELLED').count()
+    no_show_rate = round((100.0 * no_show_total / denom), 1) if denom else 0.0
+
+    checked_in_today_qs = base.filter(status='CHECKED_IN', scheduled_datetime__date=today)
+    checked_in_today = checked_in_today_qs.count()
+    now = timezone.now()
+    wait_sum = 0.0
+    wait_n = 0
+    for appt in checked_in_today_qs.exclude(check_in_time__isnull=True):
+        delta_sec = (now - appt.check_in_time).total_seconds()
+        if delta_sec >= 0:
+            wait_sum += delta_sec / 60.0
+            wait_n += 1
+    avg_wait_minutes_today = round(wait_sum / wait_n, 1) if wait_n else 0.0
+
+    pending_requests = base.filter(status='REQUESTED').count()
+
+    confirmed_today = base.filter(status='CONFIRMED', scheduled_datetime__date=today).count()
+    waiting_now = checked_in_today
+
+    return Response(
+        {
+            'total_appointments': total_appointments,
+            'appointments_new_this_month': appointments_new_this_month,
+            'total_patients': total_patients,
+            'patients_new_this_month': patients_new_this_month,
+            'completed_total': completed_total,
+            'completed_today': completed_today,
+            'no_show_total': no_show_total,
+            'no_show_rate': no_show_rate,
+            'avg_wait_minutes_today': avg_wait_minutes_today,
+            'checked_in_today': checked_in_today,
+            'pending_requests': pending_requests,
+            'confirmed_today': confirmed_today,
+            'currently_waiting': waiting_now,
+        }
+    )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsDoctor])
+def doctor_appointments_over_time(request):
+    doctor = _get_logged_in_doctor(request)
+    if not doctor:
+        return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
+
+    period = (request.query_params.get('period') or '7d').strip().lower()
+    days = {'7d': 7, '30d': 30, '90d': 90}.get(period, 7)
+    today = timezone.localdate()
+    points = []
+    for i in range(days - 1, -1, -1):
+        d = today - timedelta(days=i)
+        c = Appointment.objects.filter(doctor=doctor, scheduled_datetime__date=d).count()
+        if days <= 14:
+            label = d.strftime('%a')
+        else:
+            label = d.strftime('%m/%d')
+        points.append({'date': d.isoformat(), 'label': label, 'count': c})
+
+    return Response({'period': period, 'points': points})
+
+
+_STATUS_ORDER = (
+    'COMPLETED',
+    'CONFIRMED',
+    'CHECKED_IN',
+    'REQUESTED',
+    'NO_SHOW',
+    'CANCELLED',
+)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsDoctor])
+def doctor_appointment_status_breakdown(request):
+    doctor = _get_logged_in_doctor(request)
+    if not doctor:
+        return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
+
+    rows = (
+        Appointment.objects.filter(doctor=doctor)
+        .values('status')
+        .annotate(count=Count('id'))
+    )
+    count_by_status = {r['status']: r['count'] for r in rows}
+    total = sum(count_by_status.values()) or 0
+    segments = []
+    if total:
+        for st in _STATUS_ORDER:
+            c = count_by_status.get(st, 0)
+            if c:
+                segments.append(
+                    {
+                        'status': st,
+                        'count': c,
+                        'percent': round(100.0 * c / total, 1),
+                    }
+                )
+    return Response({'segments': segments, 'total': total})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsDoctor])
+def doctor_queue_today(request):
+    doctor = _get_logged_in_doctor(request)
+    if not doctor:
+        return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
+
+    today = timezone.localdate()
+    qs = (
+        Appointment.objects.filter(doctor=doctor, status='CHECKED_IN', scheduled_datetime__date=today)
+        .select_related('patient', 'patient__user')
+        .exclude(check_in_time__isnull=True)
+        .order_by('check_in_time')
+    )
+    now = timezone.now()
+    items = []
+    for appt in qs[:25]:
+        user = appt.patient.user
+        fn = (user.first_name or '').strip()
+        ln = (user.last_name or '').strip()
+        name = f'{fn} {ln}'.strip() or user.username
+        initials = ''
+        if fn and ln:
+            initials = (fn[0] + ln[0]).upper()
+        elif name:
+            initials = name[:2].upper()
+        wait_minutes = int((now - appt.check_in_time).total_seconds() // 60)
+        if wait_minutes < 0:
+            wait_minutes = 0
+        items.append(
+            {
+                'id': appt.id,
+                'patient_initials': initials,
+                'patient_name': name,
+                'scheduled_datetime': appt.scheduled_datetime,
+                'wait_minutes': wait_minutes,
+            }
+        )
+    return Response({'items': items})
 

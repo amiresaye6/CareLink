@@ -12,7 +12,8 @@ from accounts.models import DoctorProfile, PatientProfile
 from appointments.models import WeeklySchedule, ScheduleException, Appointment
 from appointments.api.serializers import DoctorAppointmentDetailsSerializer, BookAppointmentSerializer
 from rest_framework.permissions import IsAuthenticated , AllowAny
-from accounts.apis.permissions import IsPatient
+from accounts.apis.permissions import IsPatient, IsDoctor
+from dashboard.api.doctor.views import update_logged_in_doctor_appointment_status
 
 
 def _parse_int(value, default):
@@ -259,3 +260,9 @@ def book_appointment(request, doctor_id):
         },
         status=status.HTTP_201_CREATED,
     )
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated, IsDoctor])
+def doctor_patch_appointment(request, appointment_id):
+    return update_logged_in_doctor_appointment_status(request, appointment_id)

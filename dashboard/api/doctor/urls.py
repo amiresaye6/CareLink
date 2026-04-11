@@ -1,6 +1,10 @@
 from django.urls import path
 
 from dashboard.api.doctor.views import (
+    doctor_dashboard_stats,
+    doctor_appointments_over_time,
+    doctor_appointment_status_breakdown,
+    doctor_queue_today,
     get_doctor_by_id,
     update_doctor_by_id,
     get_logged_in_doctor,
@@ -62,4 +66,12 @@ urlpatterns = [
         delete_logged_in_doctor_appointment,
         name='dashboard.api.doctor.delete_logged_in_doctor_appointment',
     ),
+
+
+
+
+    path('stats/', doctor_dashboard_stats, name='dashboard.api.doctor.doctor_dashboard_stats'),
+    path('appointments-over-time/', doctor_appointments_over_time, name='dashboard.api.doctor.doctor_appointments_over_time'),
+    path('status-breakdown/', doctor_appointment_status_breakdown, name='dashboard.api.doctor.doctor_appointment_status_breakdown'),
+    path('queue-today/', doctor_queue_today, name='dashboard.api.doctor.doctor_queue_today'),
 ]

@@ -239,6 +239,8 @@ class DoctorPatientDetailSerializer(serializers.ModelSerializer):
 class DoctorAppointmentListSerializer(serializers.ModelSerializer):
     patient_id = serializers.IntegerField(source='patient.id', read_only=True)
     patient_username = serializers.CharField(source='patient.user.username', read_only=True)
+    patient_first_name = serializers.CharField(source='patient.user.first_name', read_only=True)
+    patient_last_name = serializers.CharField(source='patient.user.last_name', read_only=True)
     patient_email = serializers.EmailField(source='patient.user.email', read_only=True)
     patient_phone = serializers.CharField(source='patient.phone_number', read_only=True)
 
@@ -253,6 +255,8 @@ class DoctorAppointmentListSerializer(serializers.ModelSerializer):
             'check_in_time',
             'patient_id',
             'patient_username',
+            'patient_first_name',
+            'patient_last_name',
             'patient_email',
             'patient_phone',
         ]
@@ -281,7 +285,7 @@ class DoctorUpdateAppointmentStatusSerializer(serializers.Serializer):
 
     def validate_status(self, value):
         value = (value or '').strip().upper()
-        allowed_targets = {'CONFIRMED', 'COMPLETED', 'NO_SHOW'}
+        allowed_targets = {'CONFIRMED', 'COMPLETED', 'NO_SHOW', 'CANCELLED'}
         if value not in allowed_targets:
             raise serializers.ValidationError('Invalid status value.')
         return value

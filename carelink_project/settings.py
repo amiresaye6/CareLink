@@ -33,7 +33,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # seup for environment variables :__:
 env = environ.Env()
 # environ.Env.read_env()
-environ.Env.read_env(BASE_DIR / '.env')
+environ.Env.read_env()
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/

@@ -44,7 +44,11 @@ SECRET_KEY = 'django-insecure-7wfjrg#xv0-@+wd$d$c545ob^2dve0%@8uvh64klkjsj3v91t6
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+
+# Dev only — allow any origin. Do not use in production.
+# (Credentials + wildcard origin are invalid in browsers; Token auth uses headers only.)
+CORS_ALLOW_ALL_ORIGINS = True
 
 
 # Application definition
@@ -56,6 +60,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'corsheaders',
     'rest_framework',
     'accounts.apps.AccountsConfig',
     'appointments.apps.AppointmentsConfig',
@@ -67,6 +72,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',

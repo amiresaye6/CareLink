@@ -32,8 +32,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # seup for environment variables :__:
 env = environ.Env()
-environ.Env.read_env()
-
+# environ.Env.read_env()
+environ.Env.read_env(BASE_DIR / '.env')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -171,3 +171,4 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # configuration for the multy user project :__:
 AUTH_USER_MODEL = 'accounts.User'
+

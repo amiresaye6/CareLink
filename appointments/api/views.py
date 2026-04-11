@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -97,6 +97,7 @@ def _day_bounds(day_date):
 
 
 def _generate_available_slots(doctor, range_start, range_end):
+   
     booked = set(
         Appointment.objects.filter(
             doctor=doctor,
@@ -131,6 +132,26 @@ def _generate_available_slots(doctor, range_start, range_end):
         current_day = current_day + timedelta(days=1)
 
     return slots
+
+
+def _patient_has_overlapping_appointment(patient, start_dt, end_dt):
+    max_reasonable_session = timedelta(hours=48)
+    window_start = start_dt - max_reasonable_session
+    qs = (
+        Appointment.objects.filter(
+            patient=patient,
+            scheduled_datetime__gte=window_start,
+            scheduled_datetime__lt=end_dt,
+        )
+        .exclude(status='CANCELLED')
+        .select_related('doctor')
+    )
+    for appt in qs:
+        dur = int(appt.doctor.session_duration or 30)
+        appt_end = appt.scheduled_datetime + timedelta(minutes=dur)
+        if start_dt < appt_end and end_dt > appt.scheduled_datetime:
+            return True
+    return False
 
 
 @api_view(['GET'])
@@ -181,7 +202,6 @@ def book_appointment(request, doctor_id):
     if not ser.is_valid():
         return Response({'message': 'not valid', 'errors': ser.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-    doctor = get_object_or_404(DoctorProfile, pk=doctor_id)
     scheduled_dt = ser.validated_data['scheduled_datetime']
     is_telemedicine = ser.validated_data.get('is_telemedicine', False)
 
@@ -191,34 +211,37 @@ def book_appointment(request, doctor_id):
     if scheduled_dt <= timezone.now():
         return Response({'message': 'not valid', 'errors': {'scheduled_datetime': ['Must be in the future']}}, status=status.HTTP_400_BAD_REQUEST)
 
-    if not _is_datetime_in_doctor_availability(doctor, scheduled_dt):
-        return Response({'message': 'not valid', 'errors': {'scheduled_datetime': ['Not in doctor availability']}}, status=status.HTTP_400_BAD_REQUEST)
-
-    duration_min = int(doctor.session_duration or 30)
-    end_dt = scheduled_dt + timedelta(minutes=duration_min)
-
     with transaction.atomic():
-        overlap = Appointment.objects.filter(
-            patient=patient,
-            scheduled_datetime__lt=end_dt,
-            scheduled_datetime__gt=scheduled_dt - timedelta(minutes=duration_min),
-        ).exclude(status='CANCELLED').exists()
-        if overlap:
-            return Response({'message': 'not valid', 'errors': {'scheduled_datetime': ['Patient has overlapping appointment']}}, status=status.HTTP_400_BAD_REQUEST)
+        doctor = get_object_or_404(DoctorProfile.objects.select_for_update(), pk=doctor_id)
+        patient_locked = PatientProfile.objects.select_for_update().get(pk=patient.pk)
 
-     
+        if not _is_datetime_in_doctor_availability(doctor, scheduled_dt):
+            return Response(
+                {'message': 'not valid', 'errors': {'scheduled_datetime': ['Not in doctor availability']}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        duration_min = int(doctor.session_duration or 30)
+        end_dt = scheduled_dt + timedelta(minutes=duration_min)
+
+        if _patient_has_overlapping_appointment(patient_locked, scheduled_dt, end_dt):
+            return Response(
+                {'message': 'not valid', 'errors': {'scheduled_datetime': ['Patient has overlapping appointment']}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         if Appointment.objects.filter(doctor=doctor, scheduled_datetime=scheduled_dt).exclude(status='CANCELLED').exists():
             return Response({'message': 'not valid', 'errors': {'scheduled_datetime': ['Slot already booked']}}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             appt = Appointment.objects.create(
-                patient=patient,
+                patient=patient_locked,
                 doctor=doctor,
                 scheduled_datetime=scheduled_dt,
                 status='REQUESTED',
                 is_telemedicine=is_telemedicine,
             )
-        except Exception:
+        except IntegrityError:
             return Response({'message': 'not valid', 'errors': {'scheduled_datetime': ['Slot already booked']}}, status=status.HTTP_400_BAD_REQUEST)
 
     return Response(

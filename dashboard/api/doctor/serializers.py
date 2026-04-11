@@ -276,6 +276,17 @@ class DoctorAppointmentPatientSummarySerializer(serializers.ModelSerializer):
         ]
 
 
+class DoctorUpdateAppointmentStatusSerializer(serializers.Serializer):
+    status = serializers.CharField(required=True, write_only=True)
+
+    def validate_status(self, value):
+        value = (value or '').strip().upper()
+        allowed_targets = {'CONFIRMED', 'COMPLETED', 'NO_SHOW'}
+        if value not in allowed_targets:
+            raise serializers.ValidationError('Invalid status value.')
+        return value
+
+
 class DoctorAppointmentDetailSerializer(serializers.ModelSerializer):
     patient = DoctorAppointmentPatientSummarySerializer(read_only=True)
     consultation = ConsultationForDoctorPatientSerializer(read_only=True)

@@ -10,6 +10,8 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
+from django.core.exceptions import ObjectDoesNotExist
+
 from accounts.models import DoctorProfile, PatientProfile
 from appointments.models import WeeklySchedule, ScheduleException, Appointment
 from dashboard.api.doctor.serializers import (
@@ -22,6 +24,7 @@ from dashboard.api.doctor.serializers import (
     DoctorPatientDetailSerializer,
     DoctorAppointmentListSerializer,
     DoctorAppointmentDetailSerializer,
+    DoctorUpdateAppointmentStatusSerializer,
 )
 
 
@@ -46,6 +49,18 @@ def _truthy_query_param(value):
     if value is None:
         return False
     return str(value).strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def _consultation_record_complete(appointment):
+    try:
+        c = appointment.consultation
+    except ObjectDoesNotExist:
+        return False
+    if not c.diagnosis or not str(c.diagnosis).strip():
+        return False
+    if not c.clinical_notes or not str(c.clinical_notes).strip():
+        return False
+    return True
 
 
 class DoctorPatientListPagination(PageNumberPagination):
@@ -470,4 +485,91 @@ def get_logged_in_doctor_appointment_detail(request, appointment_id):
     )
     data = DoctorAppointmentDetailSerializer(appt).data
     return Response({'appointment': data}, status=status.HTTP_200_OK)
+
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_logged_in_doctor_appointment_status(request, appointment_id):
+    doctor = _get_logged_in_doctor(request)
+    if not doctor:
+        return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
+
+    appt = get_object_or_404(Appointment.objects.filter(doctor=doctor), pk=appointment_id)
+
+    ser = DoctorUpdateAppointmentStatusSerializer(data=request.data)
+    if not ser.is_valid():
+        return Response({'message': 'not valid', 'errors': ser.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    new_status = ser.validated_data['status']
+    current = appt.status
+
+    if new_status == current:
+        return Response(
+            {'message': 'not valid', 'errors': {'status': ['Already this status']}},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if current == 'REQUESTED':
+        if new_status != 'CONFIRMED':
+            return Response(
+                {'message': 'not valid', 'errors': {'status': ['From REQUESTED you can only set CONFIRMED']}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    elif current == 'CONFIRMED':
+        return Response(
+            {
+                'message': 'not valid',
+                'errors': {'status': ['Doctor cannot change status after CONFIRMED (check-in is not done by doctor)']},
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    elif current == 'CHECKED_IN':
+        if new_status == 'COMPLETED':
+            if not _consultation_record_complete(appt):
+                return Response(
+                    {
+                        'message': 'not valid',
+                        'errors': {'status': ['COMPLETED requires a completed consultation record (diagnosis and clinical notes)']},
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        elif new_status == 'NO_SHOW':
+            pass
+        else:
+            return Response(
+                {'message': 'not valid', 'errors': {'status': ['From CHECKED_IN you can only set COMPLETED or NO_SHOW']}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    else:
+        return Response(
+            {'message': 'not valid', 'errors': {'status': ['Cannot update status from this state']}},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    appt.status = new_status
+    appt.save(update_fields=['status'])
+    data = DoctorAppointmentDetailSerializer(
+        Appointment.objects.filter(doctor=doctor)
+        .select_related('patient', 'patient__user', 'consultation')
+        .prefetch_related('consultation__prescriptions', 'consultation__tests')
+        .get(pk=appt.pk)
+    ).data
+    return Response({'message': 'object updated!', 'appointment': data}, status=status.HTTP_200_OK)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_logged_in_doctor_appointment(request, appointment_id):
+    doctor = _get_logged_in_doctor(request)
+    if not doctor:
+        return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
+
+    appt = get_object_or_404(Appointment.objects.filter(doctor=doctor), pk=appointment_id)
+    if appt.status != 'REQUESTED':
+        return Response(
+            {'message': 'not valid', 'errors': {'status': ['Delete is only allowed when status is REQUESTED']}},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    appt.delete()
+    return Response({'message': 'object deleted!'}, status=status.HTTP_200_OK)
 

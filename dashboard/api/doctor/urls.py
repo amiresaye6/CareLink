@@ -18,7 +18,9 @@ from dashboard.api.doctor.views import (
     get_logged_in_doctor_patients,
     get_logged_in_doctor_patient_detail,
     get_logged_in_doctor_appointments,
-    get_logged_in_doctor_appointment_detail
+    get_logged_in_doctor_appointment_detail,
+    update_logged_in_doctor_appointment_status,
+    delete_logged_in_doctor_appointment,
 )
 
 
@@ -45,6 +47,19 @@ urlpatterns = [
     path('patients', get_logged_in_doctor_patients, name='dashboard.api.doctor.get_logged_in_doctor_patients'),
     path('patients/<int:patient_id>', get_logged_in_doctor_patient_detail, name='dashboard.api.doctor.get_logged_in_doctor_patient_detail'),
 
+
+
+
     path('appointments', get_logged_in_doctor_appointments, name='dashboard.api.doctor.get_logged_in_doctor_appointments'),
     path('appointments/<int:appointment_id>', get_logged_in_doctor_appointment_detail, name='dashboard.api.doctor.get_logged_in_doctor_appointment_detail'),
+    path(
+        'appointments/<int:appointment_id>/status',
+        update_logged_in_doctor_appointment_status,
+        name='dashboard.api.doctor.update_logged_in_doctor_appointment_status',
+    ),
+    path(
+        'appointments/delete/<int:appointment_id>',
+        delete_logged_in_doctor_appointment,
+        name='dashboard.api.doctor.delete_logged_in_doctor_appointment',
+    ),
 ]

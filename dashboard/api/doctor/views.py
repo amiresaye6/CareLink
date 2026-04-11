@@ -20,6 +20,8 @@ from dashboard.api.doctor.serializers import (
     ScheduleExceptionModelSerializer,
     DoctorPatientListSerializer,
     DoctorPatientDetailSerializer,
+    DoctorAppointmentListSerializer,
+    DoctorAppointmentDetailSerializer,
 )
 
 
@@ -59,6 +61,23 @@ class DoctorPatientListPagination(PageNumberPagination):
                 'total_pages': self.page.paginator.num_pages,
                 'page_size': self.get_page_size(self.request),
                 'patients': data,
+            }
+        )
+
+
+class DoctorAppointmentListPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+    def get_paginated_response(self, data):
+        return Response(
+            {
+                'count': self.page.paginator.count,
+                'page': self.page.number,
+                'total_pages': self.page.paginator.num_pages,
+                'page_size': self.get_page_size(self.request),
+                'appointments': data,
             }
         )
 
@@ -365,4 +384,90 @@ def get_logged_in_doctor_patient_detail(request, patient_id):
 
     data = DoctorPatientDetailSerializer(patient, context={'doctor': doctor}).data
     return Response({'patient': data}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_logged_in_doctor_appointments(request):
+    doctor = _get_logged_in_doctor(request)
+    if not doctor:
+        return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
+
+    qs = Appointment.objects.filter(doctor=doctor).select_related('patient', 'patient__user')
+
+    status_param = (request.query_params.get('status') or request.query_params.get('appointment_status') or '').strip()
+    if status_param:
+        statuses = [s.strip() for s in status_param.split(',') if s.strip()]
+        allowed = {c[0] for c in Appointment.STATUS_CHOICES}
+        statuses = [s for s in statuses if s in allowed]
+        if statuses:
+            qs = qs.filter(status__in=statuses)
+
+    if _truthy_query_param(request.query_params.get('upcoming')):
+        qs = qs.filter(scheduled_datetime__gte=timezone.now()).exclude(status='CANCELLED')
+
+    if _truthy_query_param(request.query_params.get('past')):
+        qs = qs.filter(scheduled_datetime__lt=timezone.now())
+
+    if _truthy_query_param(request.query_params.get('is_telemedicine')):
+        qs = qs.filter(is_telemedicine=True)
+    elif (request.query_params.get('is_telemedicine') or '').strip().lower() in ('0', 'false', 'no'):
+        qs = qs.filter(is_telemedicine=False)
+
+    from_d = _parse_query_date(request.query_params.get('scheduled_from') or request.query_params.get('appointment_from'))
+    to_d = _parse_query_date(request.query_params.get('scheduled_to') or request.query_params.get('appointment_to'))
+    if from_d:
+        qs = qs.filter(scheduled_datetime__date__gte=from_d)
+    if to_d:
+        qs = qs.filter(scheduled_datetime__date__lte=to_d)
+
+    search = (request.query_params.get('search') or request.query_params.get('q') or '').strip()
+    if search:
+        if search.isdigit():
+            qs = qs.filter(Q(id=int(search)) | Q(patient__user__username__icontains=search) | Q(patient__user__email__icontains=search) | Q(patient__user__first_name__icontains=search) | Q(patient__user__last_name__icontains=search) | Q(patient__phone_number__icontains=search))
+        else:
+            qs = qs.filter(
+                Q(patient__user__username__icontains=search)
+                | Q(patient__user__email__icontains=search)
+                | Q(patient__user__first_name__icontains=search)
+                | Q(patient__user__last_name__icontains=search)
+                | Q(patient__phone_number__icontains=search)
+            )
+
+    ordering = (request.query_params.get('ordering') or '-scheduled_datetime').strip()
+    order_map = {
+        'scheduled_datetime': 'scheduled_datetime',
+        '-scheduled_datetime': '-scheduled_datetime',
+        'status': 'status',
+        '-status': '-status',
+        'id': 'id',
+        '-id': '-id',
+        'patient': 'patient__user__username',
+        '-patient': '-patient__user__username',
+        'check_in_time': 'check_in_time',
+        '-check_in_time': '-check_in_time',
+    }
+    qs = qs.order_by(order_map.get(ordering, '-scheduled_datetime'))
+
+    paginator = DoctorAppointmentListPagination()
+    page = paginator.paginate_queryset(qs, request)
+    serializer = DoctorAppointmentListSerializer(page, many=True)
+    return paginator.get_paginated_response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_logged_in_doctor_appointment_detail(request, appointment_id):
+    doctor = _get_logged_in_doctor(request)
+    if not doctor:
+        return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
+
+    appt = get_object_or_404(
+        Appointment.objects.filter(doctor=doctor)
+        .select_related('patient', 'patient__user', 'consultation')
+        .prefetch_related('consultation__prescriptions', 'consultation__tests'),
+        pk=appointment_id,
+    )
+    data = DoctorAppointmentDetailSerializer(appt).data
+    return Response({'appointment': data}, status=status.HTTP_200_OK)
 

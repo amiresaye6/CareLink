@@ -234,3 +234,61 @@ class DoctorPatientDetailSerializer(serializers.ModelSerializer):
             .order_by('-scheduled_datetime')
         )
         return DoctorPatientAppointmentSerializer(qs, many=True).data
+
+
+class DoctorAppointmentListSerializer(serializers.ModelSerializer):
+    patient_id = serializers.IntegerField(source='patient.id', read_only=True)
+    patient_username = serializers.CharField(source='patient.user.username', read_only=True)
+    patient_email = serializers.EmailField(source='patient.user.email', read_only=True)
+    patient_phone = serializers.CharField(source='patient.phone_number', read_only=True)
+
+    class Meta:
+        model = Appointment
+        fields = [
+            'id',
+            'scheduled_datetime',
+            'status',
+            'is_telemedicine',
+            'meeting_link',
+            'check_in_time',
+            'patient_id',
+            'patient_username',
+            'patient_email',
+            'patient_phone',
+        ]
+
+
+class DoctorAppointmentPatientSummarySerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    email = serializers.EmailField(source='user.email', read_only=True)
+    role = serializers.CharField(source='user.role', read_only=True)
+
+    class Meta:
+        model = PatientProfile
+        fields = [
+            'id',
+            'username',
+            'email',
+            'role',
+            'date_of_birth',
+            'phone_number',
+            'medical_history',
+        ]
+
+
+class DoctorAppointmentDetailSerializer(serializers.ModelSerializer):
+    patient = DoctorAppointmentPatientSummarySerializer(read_only=True)
+    consultation = ConsultationForDoctorPatientSerializer(read_only=True)
+
+    class Meta:
+        model = Appointment
+        fields = [
+            'id',
+            'patient',
+            'scheduled_datetime',
+            'status',
+            'check_in_time',
+            'is_telemedicine',
+            'meeting_link',
+            'consultation',
+        ]

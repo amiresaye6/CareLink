@@ -5,8 +5,6 @@ from dashboard.api.doctor.views import (
     update_doctor_by_id,
     get_logged_in_doctor,
     update_logged_in_doctor,
-    get_logged_in_doctor_patients,
-    get_logged_in_doctor_patient_detail,
     get_logged_in_weekly_schedules,
     create_logged_in_weekly_schedule,
     update_logged_in_weekly_schedule,
@@ -17,6 +15,10 @@ from dashboard.api.doctor.views import (
     create_logged_in_schedule_exception,
     update_logged_in_schedule_exception,
     delete_logged_in_schedule_exception,
+    get_logged_in_doctor_patients,
+    get_logged_in_doctor_patient_detail,
+    get_logged_in_doctor_appointments,
+    get_logged_in_doctor_appointment_detail
 )
 
 
@@ -42,4 +44,7 @@ urlpatterns = [
 
     path('patients', get_logged_in_doctor_patients, name='dashboard.api.doctor.get_logged_in_doctor_patients'),
     path('patients/<int:patient_id>', get_logged_in_doctor_patient_detail, name='dashboard.api.doctor.get_logged_in_doctor_patient_detail'),
+
+    path('appointments', get_logged_in_doctor_appointments, name='dashboard.api.doctor.get_logged_in_doctor_appointments'),
+    path('appointments/<int:appointment_id>', get_logged_in_doctor_appointment_detail, name='dashboard.api.doctor.get_logged_in_doctor_appointment_detail'),
 ]

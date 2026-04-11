@@ -54,13 +54,13 @@ CORS_ALLOW_ALL_ORIGINS = True
 # Application definition
 
 INSTALLED_APPS = [
+    'corsheaders',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'corsheaders',
     'rest_framework',
     'accounts.apps.AccountsConfig',
     'appointments.apps.AppointmentsConfig',
@@ -70,6 +70,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -118,7 +119,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': env('DB_NAME'),
         'USER': env('DB_USER'),
-        'PASSWORD': env('DB_PASSWORD'),
+        'PASSWORD': '',
         'HOST': env('DB_HOST'),
         'PORT': env('DB_PORT'),
     }
@@ -178,3 +179,6 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # configuration for the multy user project :__:
 AUTH_USER_MODEL = 'accounts.User'
 
+
+
+CORS_ALLOW_ALL_ORIGINS = True

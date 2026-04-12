@@ -437,8 +437,16 @@ def get_logged_in_doctor_appointments(request):
     elif (request.query_params.get('is_telemedicine') or '').strip().lower() in ('0', 'false', 'no'):
         qs = qs.filter(is_telemedicine=False)
 
-    from_d = _parse_query_date(request.query_params.get('scheduled_from') or request.query_params.get('appointment_from'))
-    to_d = _parse_query_date(request.query_params.get('scheduled_to') or request.query_params.get('appointment_to'))
+    from_d = _parse_query_date(
+        request.query_params.get('date_from')
+        or request.query_params.get('scheduled_from')
+        or request.query_params.get('appointment_from')
+    )
+    to_d = _parse_query_date(
+        request.query_params.get('date_to')
+        or request.query_params.get('scheduled_to')
+        or request.query_params.get('appointment_to')
+    )
     if from_d:
         qs = qs.filter(scheduled_datetime__date__gte=from_d)
     if to_d:
@@ -467,6 +475,8 @@ def get_logged_in_doctor_appointments(request):
         '-id': '-id',
         'patient': 'patient__user__username',
         '-patient': '-patient__user__username',
+        'patient__user__last_name': 'patient__user__last_name',
+        '-patient__user__last_name': '-patient__user__last_name',
         'check_in_time': 'check_in_time',
         '-check_in_time': '-check_in_time',
     }
@@ -524,13 +534,14 @@ def update_logged_in_doctor_appointment_status(request, appointment_id):
                 status=status.HTTP_400_BAD_REQUEST,
             )
     elif current == 'CONFIRMED':
-        return Response(
-            {
-                'message': 'not valid',
-                'errors': {'status': ['Doctor cannot change status after CONFIRMED (check-in is not done by doctor)']},
-            },
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+        if new_status != 'NO_SHOW':
+            return Response(
+                {
+                    'message': 'not valid',
+                    'errors': {'status': ['From CONFIRMED you can only set NO_SHOW']},
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
     elif current == 'CHECKED_IN':
         if new_status == 'COMPLETED':
             if not _consultation_record_complete(appt):

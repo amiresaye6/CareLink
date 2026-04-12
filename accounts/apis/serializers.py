@@ -14,6 +14,7 @@ class SignUpDoctorSerializer(serializers.Serializer):
     specialty = serializers.ChoiceField(choices=DoctorProfile.SPECIALTY_CHOICES, required=True, write_only=True)
     session_duration = serializers.ChoiceField(choices=DoctorProfile.SESSION_CHOICES, required=True, write_only=True)
     buffer_time = serializers.IntegerField(required=True,write_only=True)
+    session_price = serializers.IntegerField(required=True)
 
     def create(self, validated_data):
         user = User.objects.create_user(
@@ -33,7 +34,8 @@ class SignUpDoctorSerializer(serializers.Serializer):
             user = user,
             specialty = validated_data['specialty'],
             session_duration = validated_data['session_duration'],
-            buffer_time = validated_data['buffer_time']
+            buffer_time = validated_data['buffer_time'],
+            session_price = validated_data['session_price']
         )
         return user
 
@@ -164,7 +166,7 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DoctorProfile
-        fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role', 'specialty', 'session_duration', 'buffer_time']
+        fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role', 'specialty', 'session_duration', 'buffer_time','session_price']
 
 
 

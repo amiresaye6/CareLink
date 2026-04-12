@@ -262,7 +262,100 @@ def book_appointment(request, doctor_id):
     )
 
 
+
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated, IsDoctor])
 def doctor_patch_appointment(request, appointment_id):
     return update_logged_in_doctor_appointment_status(request, appointment_id)
+
+
+from appointments.api.serializers import (
+    QueueSerializer,
+    AppointmentListSerializer,
+    AppointmentStatusUpdateSerializer,
+)
+from accounts.apis.permissions import IsReceptionist, IsDoctor
+
+@api_view(['GET'])
+@permission_classes([IsReceptionist | IsDoctor])
+def today_queue(request):
+    
+    today = timezone.localdate()
+
+    appointments = (
+        Appointment.objects
+        .filter(scheduled_datetime__date=today)
+        .exclude(status__in=['CANCELLED', 'NO_SHOW'])
+        .select_related(
+            'patient__user',
+            'doctor__user',
+        )
+        .order_by('check_in_time', 'scheduled_datetime')
+    )
+
+    serializer = QueueSerializer(appointments, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsReceptionist])
+def appointment_list(request):
+
+    appointments = (
+        Appointment.objects
+        .select_related('patient__user', 'doctor__user')
+        .all()
+        .order_by('-scheduled_datetime')
+    )
+
+    status_filter  = request.query_params.get('status')
+    date_filter    = request.query_params.get('date')
+    doctor_filter  = request.query_params.get('doctor')
+    patient_filter = request.query_params.get('patient')
+
+    if status_filter:
+        appointments = appointments.filter(status=status_filter.upper())
+    if date_filter:
+        appointments = appointments.filter(scheduled_datetime__date=date_filter)
+    if doctor_filter:
+        appointments = appointments.filter(doctor__id=doctor_filter)
+    if patient_filter:
+        appointments = appointments.filter(patient__id=patient_filter)
+
+    serializer = AppointmentListSerializer(appointments, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsReceptionist])
+def update_appointment_status(request, appointment_id):
+    
+    appointment = get_object_or_404(Appointment, pk=appointment_id)
+
+    serializer = AppointmentStatusUpdateSerializer(
+        appointment,
+        data=request.data,
+        partial=True,
+    )
+
+    if serializer.is_valid():
+        new_status = serializer.validated_data['status']
+
+        if new_status == 'CHECKED_IN':
+            appointment.check_in_time = timezone.now()
+
+        serializer.save()
+
+        return Response(
+            {
+                'message': f'Appointment status updated to {new_status}.',
+                'appointment': AppointmentListSerializer(appointment).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    return Response(
+        {'message': 'not valid', 'errors': serializer.errors},
+        status=status.HTTP_400_BAD_REQUEST,
+    )
+

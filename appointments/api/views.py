@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -12,7 +12,8 @@ from accounts.models import DoctorProfile, PatientProfile
 from appointments.models import WeeklySchedule, ScheduleException, Appointment
 from appointments.api.serializers import DoctorAppointmentDetailsSerializer, BookAppointmentSerializer
 from rest_framework.permissions import IsAuthenticated , AllowAny
-from accounts.apis.permissions import IsPatient
+from accounts.apis.permissions import IsPatient, IsDoctor, IsAdmin
+from dashboard.api.doctor.views import update_logged_in_doctor_appointment_status
 
 
 def _parse_int(value, default):
@@ -97,6 +98,7 @@ def _day_bounds(day_date):
 
 
 def _generate_available_slots(doctor, range_start, range_end):
+   
     booked = set(
         Appointment.objects.filter(
             doctor=doctor,
@@ -133,8 +135,28 @@ def _generate_available_slots(doctor, range_start, range_end):
     return slots
 
 
+def _patient_has_overlapping_appointment(patient, start_dt, end_dt):
+    max_reasonable_session = timedelta(hours=48)
+    window_start = start_dt - max_reasonable_session
+    qs = (
+        Appointment.objects.filter(
+            patient=patient,
+            scheduled_datetime__gte=window_start,
+            scheduled_datetime__lt=end_dt,
+        )
+        .exclude(status='CANCELLED')
+        .select_related('doctor')
+    )
+    for appt in qs:
+        dur = int(appt.doctor.session_duration or 30)
+        appt_end = appt.scheduled_datetime + timedelta(minutes=dur)
+        if start_dt < appt_end and end_dt > appt.scheduled_datetime:
+            return True
+    return False
+
+
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated , IsDoctor , IsAdmin])
 def doctor_appointment_details(request, id):
     doctor = get_object_or_404(DoctorProfile, pk=id)
 
@@ -171,7 +193,7 @@ def doctor_appointment_details(request, id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated , IsPatient])
 def book_appointment(request, doctor_id):
     patient = _get_logged_in_patient(request)
     if not patient:
@@ -181,7 +203,6 @@ def book_appointment(request, doctor_id):
     if not ser.is_valid():
         return Response({'message': 'not valid', 'errors': ser.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-    doctor = get_object_or_404(DoctorProfile, pk=doctor_id)
     scheduled_dt = ser.validated_data['scheduled_datetime']
     is_telemedicine = ser.validated_data.get('is_telemedicine', False)
 
@@ -191,34 +212,37 @@ def book_appointment(request, doctor_id):
     if scheduled_dt <= timezone.now():
         return Response({'message': 'not valid', 'errors': {'scheduled_datetime': ['Must be in the future']}}, status=status.HTTP_400_BAD_REQUEST)
 
-    if not _is_datetime_in_doctor_availability(doctor, scheduled_dt):
-        return Response({'message': 'not valid', 'errors': {'scheduled_datetime': ['Not in doctor availability']}}, status=status.HTTP_400_BAD_REQUEST)
-
-    duration_min = int(doctor.session_duration or 30)
-    end_dt = scheduled_dt + timedelta(minutes=duration_min)
-
     with transaction.atomic():
-        overlap = Appointment.objects.filter(
-            patient=patient,
-            scheduled_datetime__lt=end_dt,
-            scheduled_datetime__gt=scheduled_dt - timedelta(minutes=duration_min),
-        ).exclude(status='CANCELLED').exists()
-        if overlap:
-            return Response({'message': 'not valid', 'errors': {'scheduled_datetime': ['Patient has overlapping appointment']}}, status=status.HTTP_400_BAD_REQUEST)
+        doctor = get_object_or_404(DoctorProfile.objects.select_for_update(), pk=doctor_id)
+        patient_locked = PatientProfile.objects.select_for_update().get(pk=patient.pk)
 
-     
+        if not _is_datetime_in_doctor_availability(doctor, scheduled_dt):
+            return Response(
+                {'message': 'not valid', 'errors': {'scheduled_datetime': ['Not in doctor availability']}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        duration_min = int(doctor.session_duration or 30)
+        end_dt = scheduled_dt + timedelta(minutes=duration_min)
+
+        if _patient_has_overlapping_appointment(patient_locked, scheduled_dt, end_dt):
+            return Response(
+                {'message': 'not valid', 'errors': {'scheduled_datetime': ['Patient has overlapping appointment']}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         if Appointment.objects.filter(doctor=doctor, scheduled_datetime=scheduled_dt).exclude(status='CANCELLED').exists():
             return Response({'message': 'not valid', 'errors': {'scheduled_datetime': ['Slot already booked']}}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             appt = Appointment.objects.create(
-                patient=patient,
+                patient=patient_locked,
                 doctor=doctor,
                 scheduled_datetime=scheduled_dt,
                 status='REQUESTED',
                 is_telemedicine=is_telemedicine,
             )
-        except Exception:
+        except IntegrityError:
             return Response({'message': 'not valid', 'errors': {'scheduled_datetime': ['Slot already booked']}}, status=status.HTTP_400_BAD_REQUEST)
 
     return Response(
@@ -236,3 +260,102 @@ def book_appointment(request, doctor_id):
         },
         status=status.HTTP_201_CREATED,
     )
+
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated, IsDoctor , IsAdmin])
+def doctor_patch_appointment(request, appointment_id):
+    return update_logged_in_doctor_appointment_status(request, appointment_id)
+
+
+from appointments.api.serializers import (
+    QueueSerializer,
+    AppointmentListSerializer,
+    AppointmentStatusUpdateSerializer,
+)
+from accounts.apis.permissions import IsReceptionist, IsDoctor
+
+@api_view(['GET'])
+@permission_classes([IsReceptionist | IsDoctor])
+def today_queue(request):
+    
+    today = timezone.localdate()
+
+    appointments = (
+        Appointment.objects
+        .filter(scheduled_datetime__date=today)
+        .exclude(status__in=['CANCELLED', 'NO_SHOW'])
+        .select_related(
+            'patient__user',
+            'doctor__user',
+        )
+        .order_by('check_in_time', 'scheduled_datetime')
+    )
+
+    serializer = QueueSerializer(appointments, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsReceptionist])
+def appointment_list(request):
+
+    appointments = (
+        Appointment.objects
+        .select_related('patient__user', 'doctor__user')
+        .all()
+        .order_by('-scheduled_datetime')
+    )
+
+    status_filter  = request.query_params.get('status')
+    date_filter    = request.query_params.get('date')
+    doctor_filter  = request.query_params.get('doctor')
+    patient_filter = request.query_params.get('patient')
+
+    if status_filter:
+        appointments = appointments.filter(status=status_filter.upper())
+    if date_filter:
+        appointments = appointments.filter(scheduled_datetime__date=date_filter)
+    if doctor_filter:
+        appointments = appointments.filter(doctor__id=doctor_filter)
+    if patient_filter:
+        appointments = appointments.filter(patient__id=patient_filter)
+
+    serializer = AppointmentListSerializer(appointments, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsReceptionist | IsDoctor])
+def update_appointment_status(request, appointment_id):
+    
+    appointment = get_object_or_404(Appointment, pk=appointment_id)
+
+    serializer = AppointmentStatusUpdateSerializer(
+        appointment,
+        data=request.data,
+        partial=True,
+    )
+
+    if serializer.is_valid():
+        new_status = serializer.validated_data['status']
+
+        if new_status == 'CHECKED_IN':
+            appointment.check_in_time = timezone.now()
+
+        serializer.save()
+
+        return Response(
+            {
+                'message': f'Appointment status updated to {new_status}.',
+                'appointment': AppointmentListSerializer(appointment).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    return Response(
+        {'message': 'not valid', 'errors': serializer.errors},
+        status=status.HTTP_400_BAD_REQUEST,
+    )
+

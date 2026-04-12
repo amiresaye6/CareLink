@@ -14,7 +14,7 @@ class SignUpDoctorSerializer(serializers.Serializer):
     specialty = serializers.ChoiceField(choices=DoctorProfile.SPECIALTY_CHOICES, required=True, write_only=True)
     session_duration = serializers.ChoiceField(choices=DoctorProfile.SESSION_CHOICES, required=True, write_only=True)
     buffer_time = serializers.IntegerField(required=True,write_only=True)
-    session_price = serializers.IntegerField(required=True)
+    session_price = serializers.IntegerField(required=True,write_only=True)
 
     def create(self, validated_data):
         user = User.objects.create_user(

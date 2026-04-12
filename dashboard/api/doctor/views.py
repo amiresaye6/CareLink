@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
-from accounts.apis.permissions import IsAdmin, IsDoctor
+from accounts.apis.permissions import IsAdmin, IsDoctor, IsPatient
 from datetime import datetime, timedelta
 
 from django.db.models import Q, Count, Min
@@ -317,7 +317,7 @@ def update_logged_in_schedule_exception(request, id):
 
 
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated , IsDoctor])
+@permission_classes([IsAuthenticated , IsDoctor ])
 def delete_logged_in_schedule_exception(request, id):
     doctor = _get_logged_in_doctor(request)
     if not doctor:
@@ -328,7 +328,7 @@ def delete_logged_in_schedule_exception(request, id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated , IsDoctor])
 def get_logged_in_doctor_patients(request):
     doctor = _get_logged_in_doctor(request)
     if not doctor:
@@ -387,7 +387,7 @@ def get_logged_in_doctor_patients(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated , IsDoctor , IsAdmin])
 def get_logged_in_doctor_patient_detail(request, patient_id):
     doctor = _get_logged_in_doctor(request)
     if not doctor:
@@ -402,7 +402,7 @@ def get_logged_in_doctor_patient_detail(request, patient_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated , IsDoctor])
 def get_logged_in_doctor_appointments(request):
     doctor = _get_logged_in_doctor(request)
     if not doctor:
@@ -479,7 +479,7 @@ def get_logged_in_doctor_appointments(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated , IsDoctor , IsAdmin])
 def get_logged_in_doctor_appointment_detail(request, appointment_id):
     doctor = _get_logged_in_doctor(request)
     if not doctor:
@@ -496,7 +496,7 @@ def get_logged_in_doctor_appointment_detail(request, appointment_id):
 
 
 @api_view(['PUT', 'PATCH'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsDoctor , IsAdmin])
 def update_logged_in_doctor_appointment_status(request, appointment_id):
     doctor = _get_logged_in_doctor(request)
     if not doctor:
@@ -566,7 +566,7 @@ def update_logged_in_doctor_appointment_status(request, appointment_id):
 
 
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsDoctor])
 def delete_logged_in_doctor_appointment(request, appointment_id):
     doctor = _get_logged_in_doctor(request)
     if not doctor:

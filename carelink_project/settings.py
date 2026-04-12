@@ -32,8 +32,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # seup for environment variables :__:
 env = environ.Env()
+# environ.Env.read_env()
 environ.Env.read_env()
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -44,12 +44,17 @@ SECRET_KEY = 'django-insecure-7wfjrg#xv0-@+wd$d$c545ob^2dve0%@8uvh64klkjsj3v91t6
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+
+# Dev only — allow any origin. Do not use in production.
+# (Credentials + wildcard origin are invalid in browsers; Token auth uses headers only.)
+CORS_ALLOW_ALL_ORIGINS = True
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    'corsheaders',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -65,8 +70,10 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -173,3 +180,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # configuration for the multy user project :__:
 AUTH_USER_MODEL = 'accounts.User'
+
+
+
+CORS_ALLOW_ALL_ORIGINS = True

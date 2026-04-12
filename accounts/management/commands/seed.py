@@ -1,9 +1,26 @@
 from django.core.management.base import BaseCommand
+from django.contrib.auth.models import Group
 from django.utils import timezone
 from datetime import timedelta, time, datetime
 
 # Import models across all apps (No Bonus Features)
 from accounts.models import User, PatientProfile, DoctorProfile, ReceptionistProfile
+
+# Must match accounts.apis.permissions / signup serializers (IsDoctor, IsPatient, etc.)
+ROLE_TO_GROUP_NAME = {
+    'PATIENT': 'Patients',
+    'DOCTOR': 'Doctors',
+    'RECEPTIONIST': 'Receptionists',
+    'ADMIN': 'Admins',
+}
+
+
+def assign_user_to_role_group(user):
+    name = ROLE_TO_GROUP_NAME.get(user.role)
+    if not name:
+        return
+    group, _ = Group.objects.get_or_create(name=name)
+    user.groups.add(group)
 from appointments.models import Appointment, WeeklySchedule, ScheduleException, AppointmentAuditTrail
 from medical.models import ConsultationRecord, PrescriptionItem, TestRequest
 
@@ -27,18 +44,27 @@ class Command(BaseCommand):
             return timezone.make_aware(datetime.combine(target_date, time(hour, minute)))
 
         # 3. Create Users
-        # admin_user = User.objects.create_superuser(username='amir_admin', email='amir@clinic.com', password='password123', role='ADMIN')
+        admin_user = User.objects.create_superuser(username='amir_admin', email='amir@clinic.com', password='password123', role='ADMIN')
+        assign_user_to_role_group(admin_user)
+
         doc_donia = User.objects.create_user(username='donia_doc', email='donia@clinic.com', password='password123', role='DOCTOR')
+        assign_user_to_role_group(doc_donia)
         doc_mohamed = User.objects.create_user(username='mohamed_doc', email='mohamed@clinic.com', password='password123', role='DOCTOR')
-        
+        assign_user_to_role_group(doc_mohamed)
+
         # Receptionists
         rec_hager = User.objects.create_user(username='hager_rec', email='hager@clinic.com', password='password123', role='RECEPTIONIST')
+        assign_user_to_role_group(rec_hager)
         rec_ahmed = User.objects.create_user(username='ahmed_rec', email='ahmed@clinic.com', password='password123', role='RECEPTIONIST')
-        
+        assign_user_to_role_group(rec_ahmed)
+
         # Patients
         pat_amir_m = User.objects.create_user(username='amir_maula', email='amir.m@email.com', password='password123', role='PATIENT')
+        assign_user_to_role_group(pat_amir_m)
         pat_sara = User.objects.create_user(username='sara_smith', email='sara@email.com', password='password123', role='PATIENT')
+        assign_user_to_role_group(pat_sara)
         pat_khaled = User.objects.create_user(username='khaled_omar', email='khaled@email.com', password='password123', role='PATIENT')
+        assign_user_to_role_group(pat_khaled)
 
         # 4. Create Profiles
         prof_donia = DoctorProfile.objects.create(user=doc_donia, specialty='CARDIOLOGY', session_duration=30, buffer_time=5)

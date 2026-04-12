@@ -26,6 +26,7 @@ source care_link_venv/Scripts/activate
 **Install Core Libraries:**
 ```bash
 pip install -r Dependencies.txt
+pip install django-cors-headers
 ```
 
 ---
@@ -100,6 +101,8 @@ python manage.py runserver 1234
 - **Admin Dashboard:** `http://127.0.0.1:1234/admin/`
 
 ---
+
+
 
 ### 📂 App Responsibility Matrix
 

@@ -22,3 +22,100 @@ class DoctorAppointmentDetailsSerializer(serializers.Serializer):
 class BookAppointmentSerializer(serializers.Serializer):
     scheduled_datetime = serializers.DateTimeField(required=True, write_only=True)
     is_telemedicine = serializers.BooleanField(required=False, default=False, write_only=True)
+
+
+from appointments.models import Appointment
+from accounts.models import PatientProfile, DoctorProfile
+
+
+class PatientInfoSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PatientProfile
+        fields = ['id', 'full_name', 'phone_number']
+
+    def get_full_name(self, obj):
+        return f"{obj.user.first_name} {obj.user.last_name}".strip() or obj.user.username
+
+
+class DoctorInfoSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DoctorProfile
+        fields = ['id', 'full_name', 'specialty']
+
+    def get_full_name(self, obj):
+        first = obj.user.first_name
+        last = obj.user.last_name
+        if first or last:
+            return f"Dr. {first} {last}".strip()
+        return f"Dr. {obj.user.username}"
+
+class QueueSerializer(serializers.ModelSerializer):
+    patient = PatientInfoSerializer(read_only=True)
+    doctor = DoctorInfoSerializer(read_only=True)
+    waiting_time_minutes = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Appointment
+        fields = [
+            'id',
+            'patient',
+            'doctor',
+            'scheduled_datetime',
+            'status',
+            'check_in_time',
+            'waiting_time_minutes',
+        ]
+
+    def get_waiting_time_minutes(self, obj):
+        if obj.status == 'CHECKED_IN' and obj.check_in_time:
+            from django.utils import timezone
+            delta = timezone.now() - obj.check_in_time
+            return int(delta.total_seconds() // 60)
+        return None
+
+
+class AppointmentListSerializer(serializers.ModelSerializer):
+    patient = PatientInfoSerializer(read_only=True)
+    doctor = DoctorInfoSerializer(read_only=True)
+
+    class Meta:
+        model = Appointment
+        fields = [
+            'id',
+            'patient',
+            'doctor',
+            'scheduled_datetime',
+            'status',
+            'check_in_time',
+            'is_telemedicine',
+        ]
+
+
+class AppointmentStatusUpdateSerializer(serializers.ModelSerializer):
+
+    ALLOWED_TRANSITIONS = {
+        'REQUESTED':  ['CONFIRMED', 'CANCELLED'],
+        'CONFIRMED':  ['CHECKED_IN', 'CANCELLED', 'NO_SHOW'],
+        'CHECKED_IN': ['COMPLETED', 'NO_SHOW'],
+        'COMPLETED':  [],
+        'CANCELLED':  [],
+        'NO_SHOW':    [],
+    }
+
+    class Meta:
+        model = Appointment
+        fields = ['status']
+
+    def validate_status(self, new_status):
+        current_status = self.instance.status
+        allowed = self.ALLOWED_TRANSITIONS.get(current_status, [])
+        if new_status not in allowed:
+            raise serializers.ValidationError(
+                f"Cannot change from '{current_status}' to '{new_status}'. "
+                f"Allowed transitions: {allowed}"
+            )
+        return new_status

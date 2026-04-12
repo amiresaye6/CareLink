@@ -327,7 +327,7 @@ def appointment_list(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsReceptionist])
+@permission_classes([IsReceptionist | IsDoctor])
 def update_appointment_status(request, appointment_id):
     
     appointment = get_object_or_404(Appointment, pk=appointment_id)

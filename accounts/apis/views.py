@@ -5,6 +5,7 @@ from accounts.models import DoctorProfile, User , ReceptionistProfile ,PatientPr
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
+from .serializers import changePasswordSerializer
 from .serializers import SignUpAdminSerializer, SignUpDoctorSerializer , SignUpPatientSerializer, SignUpReceptionistSerializer, SignUpUserSerializer, UserSerializer
 from .serializers import DoctorProfileSerializer, PatientProfileSerializer, ReceptionistProfileSerializer, AdminProfileSerializer
 
@@ -80,7 +81,22 @@ def logout(request):
     request.user.auth_token.delete()
     return Response({'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
 
-
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def changePassword(request):
+    user = request.user
+    serializer = changePasswordSerializer(data=request.data)
+    if serializer.is_valid():
+        if not user.check_password(serializer.validated_data['oldPassword']):
+            return Response({"oldPassword": ["Wrong old password."]}, status=status.HTTP_400_BAD_REQUEST)
+        if serializer.validated_data['oldPassword'] == serializer.validated_data['newPassword']:
+            return Response({"newPassword": ["New password cannot be the same as the old one."]}, status=status.HTTP_400_BAD_REQUEST)
+        if serializer.validated_data['repeatNewPssword'] != serializer.validated_data['newPassword']:
+            return Response({"newPassword": ["New password doesn't match repeat Password."]}, status=status.HTTP_400_BAD_REQUEST)       
+        user.set_password(serializer.validated_data['newPassword'])
+        user.save()
+        return Response({"message": "Password updated successfully."}, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAdmin])

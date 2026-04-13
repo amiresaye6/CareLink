@@ -37,6 +37,7 @@ class DoctorProfile(models.Model):
     specialty = models.CharField(max_length=100, choices=SPECIALTY_CHOICES)
     session_duration = models.IntegerField(choices=SESSION_CHOICES, default=30)
     buffer_time = models.IntegerField(default=5)
+    session_price = models.IntegerField(default=50)
 
     def __str__(self):
         return f"Dr. {self.user.username} - {self.specialty}"

@@ -5,9 +5,16 @@ from accounts.models import DoctorProfile, User , ReceptionistProfile ,PatientPr
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
-from .serializers import changePasswordSerializer
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.core.mail import send_mail
+import environ
+from .serializers import ResetPasswordRequestSerializer, ResetPasswordConfirmSerializer, changePasswordSerializer 
 from .serializers import SignUpAdminSerializer, SignUpDoctorSerializer , SignUpPatientSerializer, SignUpReceptionistSerializer, SignUpUserSerializer, UserSerializer
 from .serializers import DoctorProfileSerializer, PatientProfileSerializer, ReceptionistProfileSerializer, AdminProfileSerializer
+
+
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -68,7 +75,8 @@ def profile(request):
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     elif request.method == 'PATCH':
-        serializer = serializer_class(instance, data=request.data, partial=True)
+        context={'request': request}
+        serializer = serializer_class(instance, data=request.data, partial=True,context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -81,6 +89,8 @@ def logout(request):
     request.user.auth_token.delete()
     return Response({'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
 
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def changePassword(request):
@@ -88,15 +98,60 @@ def changePassword(request):
     serializer = changePasswordSerializer(data=request.data)
     if serializer.is_valid():
         if not user.check_password(serializer.validated_data['oldPassword']):
-            return Response({"oldPassword": ["Wrong old password."]}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "Wrong old password."}, status=status.HTTP_400_BAD_REQUEST)
         if serializer.validated_data['oldPassword'] == serializer.validated_data['newPassword']:
-            return Response({"newPassword": ["New password cannot be the same as the old one."]}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "New password cannot be the same as the old one."}, status=status.HTTP_400_BAD_REQUEST)
         if serializer.validated_data['repeatNewPssword'] != serializer.validated_data['newPassword']:
-            return Response({"newPassword": ["New password doesn't match repeat Password."]}, status=status.HTTP_400_BAD_REQUEST)       
+            return Response({"message": "New password doesn't match repeat Password."}, status=status.HTTP_400_BAD_REQUEST)       
         user.set_password(serializer.validated_data['newPassword'])
         user.save()
         return Response({"message": "Password updated successfully."}, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def reset_password_request(request):
+
+    serializer = ResetPasswordRequestSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    email = serializer.validated_data['email']
+
+    if not User.objects.filter(email=email):
+        return Response({'message': 'Email not found'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    user = User.objects.get(email=email)
+    token= default_token_generator.make_token(user)
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    reset_link = f"http://localhost:4200/reset-password?uid={uid}&token={token}"
+    send_mail(
+        subject='Reset Your Password',
+        message=f'Click the link to reset your password: {reset_link}',
+        from_email='mohamadelazzazy@gmail.com',
+        recipient_list=[email],
+    )
+    return Response({'message': 'Reset link sent to your email'}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def reset_password_confirm(request):
+    serializer = ResetPasswordConfirmSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    token = serializer.validated_data['token']
+    new_password = serializer.validated_data['new_password']
+    uid = request.data.get('uid')
+    user_id = force_str(urlsafe_base64_decode(uid))
+    user = User.objects.get(pk=user_id)
+    if not default_token_generator.check_token(user, token):
+        return Response({'message': 'Invalid or expired token'}, status=status.HTTP_400_BAD_REQUEST)
+    user.set_password(new_password)
+    user.save()
+    return Response({'message': 'Password reset successfully'}, status=status.HTTP_200_OK)
+
+
 
 @api_view(['GET'])
 @permission_classes([IsAdmin])

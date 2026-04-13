@@ -183,3 +183,11 @@ AUTH_USER_MODEL = 'accounts.User'
 
 
 CORS_ALLOW_ALL_ORIGINS = True
+
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = env('DB_HOST_USER')
+EMAIL_HOST_PASSWORD = env('DB_HOST_PASSWORD')

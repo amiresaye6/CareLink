@@ -155,114 +155,136 @@ class SignUpUserSerializer(serializers.ModelSerializer):
 ###############################################################
 ###############################################################
 ###############################################################
-
 class DoctorProfileSerializer(serializers.ModelSerializer):
-    first_name = serializers.CharField(source='user.first_name', read_only=True)
-    last_name = serializers.CharField(source='user.last_name', read_only=True)
-    username = serializers.CharField(source='user.username', read_only=True)
-    email = serializers.EmailField(source='user.email', read_only=True)
-    role = serializers.CharField(source='user.role', read_only=True)
+
+    first_name = serializers.SerializerMethodField()
+    last_name = serializers.SerializerMethodField()
+    username = serializers.SerializerMethodField()
+    email = serializers.SerializerMethodField()
+    role = serializers.SerializerMethodField()
 
     class Meta:
         model = DoctorProfile
         fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role',
                   'specialty', 'session_duration', 'buffer_time', 'session_price']
 
-    def to_internal_value(self, data):
-        internal = super().to_internal_value(data)
-        user_fields = ['first_name', 'last_name', 'username', 'email']
-        user_data = {}
-        for field in user_fields:
-            if field in data:
-                user_data[field] = data[field]
-        if user_data:
-            internal['user'] = user_data
-        return internal
+    def get_first_name(self, obj):
+        return obj.user.first_name
+
+    def get_last_name(self, obj):
+        return obj.user.last_name
+
+    def get_username(self, obj):
+        return obj.user.username
+
+    def get_email(self, obj):
+        return obj.user.email
+
+    def get_role(self, obj):
+        return obj.user.role
 
     def update(self, instance, validated_data):
-        user_data = validated_data.pop('user', {})
         user = instance.user
-        for attr, value in user_data.items():
-            setattr(user, attr, value)
+        data = self.context['request'].data
+        user.first_name = data.get('first_name', user.first_name)
+        user.last_name = data.get('last_name', user.last_name)
+        user.username = data.get('username', user.username)
+        user.email = data.get('email', user.email)
         user.save()
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
+        instance.specialty = validated_data.get('specialty', instance.specialty)
+        instance.session_duration = validated_data.get('session_duration', instance.session_duration)
+        instance.buffer_time = validated_data.get('buffer_time', instance.buffer_time)
+        instance.session_price = validated_data.get('session_price', instance.session_price)
         instance.save()
-        return instance
+        return instance 
 
 
 class PatientProfileSerializer(serializers.ModelSerializer):
-    first_name = serializers.CharField(source='user.first_name', read_only=True)
-    last_name = serializers.CharField(source='user.last_name', read_only=True)
-    username = serializers.CharField(source='user.username', read_only=True)
-    email = serializers.EmailField(source='user.email', read_only=True)
-    role = serializers.CharField(source='user.role', read_only=True)
+    first_name = serializers.SerializerMethodField()
+    last_name = serializers.SerializerMethodField()
+    username = serializers.SerializerMethodField()
+    email = serializers.SerializerMethodField()
+    role = serializers.SerializerMethodField()
 
     class Meta:
         model = PatientProfile
         fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role',
                   'date_of_birth', 'phone_number', 'medical_history']
 
-    def to_internal_value(self, data):
-        internal = super().to_internal_value(data)
-        user_fields = ['first_name', 'last_name', 'username', 'email']
-        user_data = {}
-        for field in user_fields:
-            if field in data:
-                user_data[field] = data[field]
-        if user_data:
-            internal['user'] = user_data
-        return internal
+    def get_first_name(self, obj):
+        return obj.user.first_name
+
+    def get_last_name(self, obj):
+        return obj.user.last_name
+
+    def get_username(self, obj):
+        return obj.user.username
+
+    def get_email(self, obj):
+        return obj.user.email
+
+    def get_role(self, obj):
+        return obj.user.role
 
     def update(self, instance, validated_data):
-        user_data = validated_data.pop('user', {})
         user = instance.user
-        for attr, value in user_data.items():
-            setattr(user, attr, value)
+        data = self.context['request'].data
+        user.first_name = data.get('first_name', user.first_name)
+        user.last_name = data.get('last_name', user.last_name)
+        user.username = data.get('username', user.username)
+        user.email = data.get('email', user.email)
         user.save()
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
+        instance.date_of_birth = validated_data.get('date_of_birth', instance.date_of_birth)
+        instance.phone_number = validated_data.get('phone_number', instance.phone_number)
+        instance.medical_history = validated_data.get('medical_history', instance.medical_history)
         instance.save()
         return instance
 
 
 class ReceptionistProfileSerializer(serializers.ModelSerializer):
-    first_name = serializers.CharField(source='user.first_name', read_only=True)
-    last_name = serializers.CharField(source='user.last_name', read_only=True)
-    username = serializers.CharField(source='user.username', read_only=True)
-    email = serializers.EmailField(source='user.email', read_only=True)
-    role = serializers.CharField(source='user.role', read_only=True)
-    doctor_name = serializers.CharField(source='doctor.user.username', read_only=True)
+    first_name = serializers.SerializerMethodField()
+    last_name = serializers.SerializerMethodField()
+    username = serializers.SerializerMethodField()
+    email = serializers.SerializerMethodField()
+    role = serializers.SerializerMethodField()
+    doctor_name = serializers.SerializerMethodField()
 
     class Meta:
         model = ReceptionistProfile
         fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role',
                   'doctor', 'doctor_name']
 
-    def to_internal_value(self, data):
-        internal = super().to_internal_value(data)
-        user_fields = ['first_name', 'last_name', 'username', 'email']
-        user_data = {}
-        for field in user_fields:
-            if field in data:
-                user_data[field] = data[field]
-        if user_data:
-            internal['user'] = user_data
-        return internal
+    def get_first_name(self, obj):
+        return obj.user.first_name
+
+    def get_last_name(self, obj):
+        return obj.user.last_name
+
+    def get_username(self, obj):
+        return obj.user.username
+
+    def get_email(self, obj):
+        return obj.user.email
+
+    def get_role(self, obj):
+        return obj.user.role
+
+    def get_doctor_name(self, obj):
+        return obj.doctor.user.username
 
     def update(self, instance, validated_data):
-        user_data = validated_data.pop('user', {})
         user = instance.user
-        for attr, value in user_data.items():
-            setattr(user, attr, value)
+        data = self.context['request'].data
+        user.first_name = data.get('first_name', user.first_name)
+        user.last_name = data.get('last_name', user.last_name)
+        user.username = data.get('username', user.username)
+        user.email = data.get('email', user.email)
         user.save()
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
+        instance.doctor = validated_data.get('doctor', instance.doctor)
         instance.save()
+        instance.refresh_from_db()
         return instance
     
-
-
 
 class AdminProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -276,7 +298,23 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role','is_active', 'date_joined']
 
 
+####################################################
+####################################################
+####################################################
+
+
 class changePasswordSerializer(serializers.Serializer):
     oldPassword = serializers.CharField(required=True)
     newPassword = serializers.CharField(required=True,min_length=8)
     repeatNewPssword = serializers.CharField(required=True,min_length=8)
+
+
+
+class ResetPasswordRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+
+class ResetPasswordConfirmSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    new_password = serializers.CharField()

@@ -230,6 +230,17 @@ def save_consultation(request, appointment_id):
         appointment.status = 'COMPLETED'
         appointment.save(update_fields=['status'])
 
+    consultation = (
+        ConsultationRecord.objects.select_related(
+            'appointment',
+            'appointment__patient',
+            'appointment__patient__user',
+            'appointment__doctor',
+            'appointment__doctor__user',
+        )
+        .prefetch_related('prescriptions', 'tests')
+        .get(pk=consultation.pk)
+    )
     return Response(
         ConsultationRecordSerializer(consultation).data,
         status=status.HTTP_201_CREATED
@@ -274,7 +285,17 @@ def edit_consultation(request, appointment_id):
         )
 
     consultation.refresh_from_db()
-    consultation = ConsultationRecord.objects.prefetch_related('prescriptions', 'tests').get(pk=consultation.pk)
+    consultation = (
+        ConsultationRecord.objects.select_related(
+            'appointment',
+            'appointment__patient',
+            'appointment__patient__user',
+            'appointment__doctor',
+            'appointment__doctor__user',
+        )
+        .prefetch_related('prescriptions', 'tests')
+        .get(pk=consultation.pk)
+    )
     return Response(ConsultationRecordSerializer(consultation).data, status=status.HTTP_200_OK)
 
 
@@ -290,7 +311,15 @@ def get_consultation(request, appointment_id):
         )
 
     consultation = get_object_or_404(
-        ConsultationRecord.objects.filter(appointment=appointment).prefetch_related(
+        ConsultationRecord.objects.filter(appointment=appointment)
+        .select_related(
+            'appointment',
+            'appointment__patient',
+            'appointment__patient__user',
+            'appointment__doctor',
+            'appointment__doctor__user',
+        )
+        .prefetch_related(
             'prescriptions',
             'tests',
         ),
@@ -316,7 +345,16 @@ def patient_consultation_summary(request, appointment_id):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    consultation = get_object_or_404(ConsultationRecord, appointment=appointment)
+    consultation = get_object_or_404(
+        ConsultationRecord.objects.select_related(
+            'appointment',
+            'appointment__patient',
+            'appointment__patient__user',
+            'appointment__doctor',
+            'appointment__doctor__user',
+        ).prefetch_related('prescriptions', 'tests'),
+        appointment=appointment,
+    )
     return Response(ConsultationRecordSerializer(consultation).data)
 
 
@@ -399,6 +437,12 @@ def patient_appointments(request):
 def doctor_consultation_history(request):
     consultations = ConsultationRecord.objects.filter(
         appointment__doctor=request.user.doctor_profile
+    ).select_related(
+        'appointment',
+        'appointment__patient',
+        'appointment__patient__user',
+        'appointment__doctor',
+        'appointment__doctor__user',
     )
 
     search = request.query_params.get('search')

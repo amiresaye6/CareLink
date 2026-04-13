@@ -3,22 +3,16 @@ from ..models import ConsultationRecord, PrescriptionItem, TestRequest
 from accounts.models import PatientProfile, DoctorProfile, User
 from appointments.models import Appointment
 
+
 class PrescriptionItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = PrescriptionItem
         fields = '__all__'
 
+
 class TestRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = TestRequest
-        fields = '__all__'
-
-class ConsultationRecordSerializer(serializers.ModelSerializer):
-    prescriptions = PrescriptionItemSerializer(many=True, read_only=True)
-    tests = TestRequestSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = ConsultationRecord
         fields = '__all__'
 
 
@@ -36,8 +30,6 @@ class PatientBasicSerializer(serializers.ModelSerializer):
         fields = ['id', 'user', 'phone_number']
 
 
-
-
 class DoctorBasicSerializer(serializers.ModelSerializer):
     user = UserBasicSerializer(read_only=True)
 
@@ -45,14 +37,30 @@ class DoctorBasicSerializer(serializers.ModelSerializer):
         model = DoctorProfile
         fields = ['id', 'user', 'specialty', 'session_duration']
 
+
 class AppointmentSerializer(serializers.ModelSerializer):
     patient = PatientBasicSerializer(read_only=True)
-    doctor = DoctorBasicSerializer(read_only=True) 
+    doctor = DoctorBasicSerializer(read_only=True)
 
     class Meta:
         model = Appointment
         fields = [
-            'id', 'patient', 'doctor', 
-            'scheduled_datetime', 'status',
-            'check_in_time', 'is_telemedicine', 'meeting_link',
+            'id',
+            'patient',
+            'doctor',
+            'scheduled_datetime',
+            'status',
+            'check_in_time',
+            'is_telemedicine',
+            'meeting_link',
         ]
+
+
+class ConsultationRecordSerializer(serializers.ModelSerializer):
+    prescriptions = PrescriptionItemSerializer(many=True, read_only=True)
+    tests = TestRequestSerializer(many=True, read_only=True)
+    appointment = AppointmentSerializer(read_only=True)
+
+    class Meta:
+        model = ConsultationRecord
+        fields = '__all__'

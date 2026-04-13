@@ -243,6 +243,7 @@ class DoctorAppointmentListSerializer(serializers.ModelSerializer):
     patient_last_name = serializers.CharField(source='patient.user.last_name', read_only=True)
     patient_email = serializers.EmailField(source='patient.user.email', read_only=True)
     patient_phone = serializers.CharField(source='patient.phone_number', read_only=True)
+    has_consultation = serializers.SerializerMethodField()
 
     class Meta:
         model = Appointment
@@ -259,7 +260,11 @@ class DoctorAppointmentListSerializer(serializers.ModelSerializer):
             'patient_last_name',
             'patient_email',
             'patient_phone',
+            'has_consultation',
         ]
+
+    def get_has_consultation(self, obj):
+        return bool(getattr(obj, 'has_consultation', False))
 
 
 class DoctorAppointmentPatientSummarySerializer(serializers.ModelSerializer):
@@ -285,6 +290,23 @@ class DoctorUpdateAppointmentStatusSerializer(serializers.Serializer):
 
     def validate_status(self, value):
         value = (value or '').strip().upper()
+        appt = self.context.get('appointment')
+        current = getattr(appt, 'status', None) if appt is not None else None
+
+        if value == 'CHECKED_IN':
+            if current not in ('COMPLETED', 'NO_SHOW'):
+                raise serializers.ValidationError(
+                    'Doctors cannot set initial check-in from here (reception does that). '
+                    'You may set Checked in only when correcting from Completed or No-show.'
+                )
+            return value
+        if value == 'REQUESTED':
+            if current != 'CONFIRMED':
+                raise serializers.ValidationError(
+                    'Return to Requested is only allowed from Confirmed.'
+                )
+            return value
+
         allowed_targets = {'CONFIRMED', 'COMPLETED', 'NO_SHOW', 'CANCELLED'}
         if value not in allowed_targets:
             raise serializers.ValidationError('Invalid status value.')

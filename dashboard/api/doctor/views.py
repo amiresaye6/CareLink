@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from accounts.apis.permissions import IsAdmin, IsDoctor, IsPatient
 from datetime import datetime, timedelta
 
-from django.db.models import Q, Count, Min
+from django.db.models import Q, Count, Min, Exists, OuterRef
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -14,6 +14,7 @@ from django.core.exceptions import ObjectDoesNotExist
 
 from accounts.models import DoctorProfile, PatientProfile
 from appointments.models import WeeklySchedule, ScheduleException, Appointment
+from medical.models import ConsultationRecord
 from dashboard.api.doctor.serializers import (
     DoctorProfileModelSerializer,
     WeeklyScheduleModelSerializer,
@@ -387,7 +388,7 @@ def get_logged_in_doctor_patients(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated , IsDoctor , IsAdmin])
+@permission_classes([IsAuthenticated, IsDoctor])
 def get_logged_in_doctor_patient_detail(request, patient_id):
     doctor = _get_logged_in_doctor(request)
     if not doctor:
@@ -416,7 +417,15 @@ def get_logged_in_doctor_appointments(request):
         except ValueError:
             return Response({'message': 'not valid', 'errors': {'doctor': ['Invalid doctor id']}}, status=status.HTTP_400_BAD_REQUEST)
 
-    qs = Appointment.objects.filter(doctor=doctor).select_related('patient', 'patient__user')
+    qs = (
+        Appointment.objects.filter(doctor=doctor)
+        .select_related('patient', 'patient__user')
+        .annotate(
+            has_consultation=Exists(
+                ConsultationRecord.objects.filter(appointment_id=OuterRef('pk')),
+            ),
+        )
+    )
 
     status_param = (request.query_params.get('status') or request.query_params.get('appointment_status') or '').strip()
     if status_param:
@@ -489,7 +498,7 @@ def get_logged_in_doctor_appointments(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated , IsDoctor , IsAdmin])
+@permission_classes([IsAuthenticated , IsDoctor])
 def get_logged_in_doctor_appointment_detail(request, appointment_id):
     doctor = _get_logged_in_doctor(request)
     if not doctor:
@@ -506,7 +515,7 @@ def get_logged_in_doctor_appointment_detail(request, appointment_id):
 
 
 @api_view(['PUT', 'PATCH'])
-@permission_classes([IsAuthenticated, IsDoctor , IsAdmin])
+@permission_classes([IsAuthenticated, IsDoctor])
 def update_logged_in_doctor_appointment_status(request, appointment_id):
     doctor = _get_logged_in_doctor(request)
     if not doctor:
@@ -514,7 +523,7 @@ def update_logged_in_doctor_appointment_status(request, appointment_id):
 
     appt = get_object_or_404(Appointment.objects.filter(doctor=doctor), pk=appointment_id)
 
-    ser = DoctorUpdateAppointmentStatusSerializer(data=request.data)
+    ser = DoctorUpdateAppointmentStatusSerializer(data=request.data, context={'appointment': appt})
     if not ser.is_valid():
         return Response({'message': 'not valid', 'errors': ser.errors}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -527,22 +536,38 @@ def update_logged_in_doctor_appointment_status(request, appointment_id):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    visit_cycle = {'CHECKED_IN', 'COMPLETED', 'NO_SHOW'}
+
     if current == 'REQUESTED':
         if new_status not in ('CONFIRMED', 'CANCELLED'):
             return Response(
-                {'message': 'not valid', 'errors': {'status': ['From REQUESTED you can only set CONFIRMED or CANCELLED']}},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-    elif current == 'CONFIRMED':
-        if new_status != 'NO_SHOW':
-            return Response(
                 {
                     'message': 'not valid',
-                    'errors': {'status': ['From CONFIRMED you can only set NO_SHOW']},
+                    'errors': {
+                        'status': [
+                            'From REQUESTED: confirm (CONFIRMED) or decline (CANCELLED). '
+                            'You cannot check in from here—reception sets CHECKED_IN after the visit is confirmed. '
+                            'Or delete the request while it is still REQUESTED.',
+                        ]
+                    },
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-    elif current == 'CHECKED_IN':
+    elif current == 'CONFIRMED':
+        if new_status not in ('NO_SHOW', 'REQUESTED'):
+            return Response(
+                {
+                    'message': 'not valid',
+                    'errors': {
+                        'status': [
+                            'From CONFIRMED: mark no-show (NO_SHOW), move back to requested (REQUESTED), '
+                            'or wait for reception to check the patient in (CHECKED_IN).',
+                        ]
+                    },
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    elif current in visit_cycle and new_status in visit_cycle:
         if new_status == 'COMPLETED':
             if not _consultation_record_complete(appt):
                 return Response(
@@ -552,13 +577,6 @@ def update_logged_in_doctor_appointment_status(request, appointment_id):
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-        elif new_status == 'NO_SHOW':
-            pass
-        else:
-            return Response(
-                {'message': 'not valid', 'errors': {'status': ['From CHECKED_IN you can only set COMPLETED or NO_SHOW']}},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
     else:
         return Response(
             {'message': 'not valid', 'errors': {'status': ['Cannot update status from this state']}},

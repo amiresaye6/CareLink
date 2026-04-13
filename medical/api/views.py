@@ -172,6 +172,23 @@ def doctor_queue(request):
     return paginator.get_paginated_response(serializer.data)
 
 
+def _replace_consultation_children(consultation, prescriptions_data, tests_data):
+    consultation.prescriptions.all().delete()
+    consultation.tests.all().delete()
+    for rx in prescriptions_data or []:
+        PrescriptionItem.objects.create(
+            consultation=consultation,
+            drug_name=(rx.get('drug_name') or '')[:150],
+            dose=(rx.get('dose') or '')[:100],
+            duration_days=int(rx.get('duration_days') or 1),
+        )
+    for test in tests_data or []:
+        TestRequest.objects.create(
+            consultation=consultation,
+            test_name=(test.get('test_name') or '')[:150],
+        )
+
+
 @api_view(['POST'])
 @permission_classes([IsDoctor])
 # @permission_classes([IsAuthenticated])
@@ -184,9 +201,14 @@ def save_consultation(request, appointment_id):
             status=status.HTTP_403_FORBIDDEN
         )
 
-    if appointment.status != 'CHECKED_IN':
+    if appointment.status not in ('CHECKED_IN', 'NO_SHOW'):
         return Response(
-            {'error': 'Consultation can only be filled for CHECKED_IN appointments'},
+            {
+                'error': (
+                    'Consultation can only be saved when the appointment is Checked in or No-show. '
+                    'Ask reception to check the patient in, or use the correct visit status first.'
+                )
+            },
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -199,31 +221,63 @@ def save_consultation(request, appointment_id):
     with transaction.atomic():
         consultation = ConsultationRecord.objects.create(
             appointment=appointment,
-            diagnosis=request.data.get('diagnosis', ''),
-            clinical_notes=request.data.get('clinical_notes', '')
+            diagnosis=(request.data.get('diagnosis') or '')[:255],
+            clinical_notes=request.data.get('clinical_notes') or '',
         )
-
-        for rx in request.data.get('prescriptions', []):
-            PrescriptionItem.objects.create(
-                consultation=consultation,
-                drug_name=rx.get('drug_name', ''),
-                dose=rx.get('dose', ''),
-                duration_days=rx.get('duration_days', 1)
-            )
-
-        for test in request.data.get('tests', []):
-            TestRequest.objects.create(
-                consultation=consultation,
-                test_name=test.get('test_name', '')
-            )
-
+        _replace_consultation_children(
+            consultation,
+            request.data.get('prescriptions'),
+            request.data.get('tests'),
+        )
         appointment.status = 'COMPLETED'
-        appointment.save()
+        appointment.save(update_fields=['status'])
 
     return Response(
         ConsultationRecordSerializer(consultation).data,
         status=status.HTTP_201_CREATED
     )
+
+
+@api_view(['PATCH', 'PUT'])
+@permission_classes([IsDoctor])
+def edit_consultation(request, appointment_id):
+    appointment = get_object_or_404(Appointment, pk=appointment_id)
+
+    if appointment.doctor != request.user.doctor_profile:
+        return Response(
+            {'error': 'You are not the doctor for this appointment'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    consultation = ConsultationRecord.objects.filter(appointment=appointment).first()
+    if not consultation:
+        return Response(
+            {'error': 'No consultation to edit. Add a consultation first.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if appointment.status not in ('CHECKED_IN', 'NO_SHOW', 'COMPLETED'):
+        return Response(
+            {'error': 'Consultation cannot be edited for this appointment status.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    with transaction.atomic():
+        locked = ConsultationRecord.objects.select_for_update().get(pk=consultation.pk)
+        locked.diagnosis = (request.data.get('diagnosis') or '')[:255]
+        locked.clinical_notes = request.data.get('clinical_notes') or ''
+        locked.save(
+            update_fields=['diagnosis', 'clinical_notes'],
+        )
+        _replace_consultation_children(
+            locked,
+            request.data.get('prescriptions'),
+            request.data.get('tests'),
+        )
+
+    consultation.refresh_from_db()
+    consultation = ConsultationRecord.objects.prefetch_related('prescriptions', 'tests').get(pk=consultation.pk)
+    return Response(ConsultationRecordSerializer(consultation).data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -238,7 +292,13 @@ def get_consultation(request, appointment_id):
             status=status.HTTP_403_FORBIDDEN
         )
 
-    consultation = get_object_or_404(ConsultationRecord, appointment=appointment)
+    consultation = get_object_or_404(
+        ConsultationRecord.objects.filter(appointment=appointment).prefetch_related(
+            'prescriptions',
+            'tests',
+        ),
+        appointment=appointment,
+    )
     return Response(ConsultationRecordSerializer(consultation).data)
 
 

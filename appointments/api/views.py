@@ -12,7 +12,7 @@ from accounts.models import DoctorProfile, PatientProfile
 from appointments.models import WeeklySchedule, ScheduleException, Appointment
 from appointments.api.serializers import DoctorAppointmentDetailsSerializer, BookAppointmentSerializer
 from rest_framework.permissions import IsAuthenticated , AllowAny
-from accounts.apis.permissions import IsPatient, IsDoctor, IsAdmin
+from accounts.apis.permissions import IsPatient, IsDoctor, IsAdmin, IsReceptionist
 from dashboard.api.doctor.views import update_logged_in_doctor_appointment_status
 
 
@@ -274,7 +274,6 @@ from appointments.api.serializers import (
     AppointmentListSerializer,
     AppointmentStatusUpdateSerializer,
 )
-from accounts.apis.permissions import IsReceptionist, IsDoctor
 
 @api_view(['GET'])
 @permission_classes([IsReceptionist | IsDoctor])
@@ -327,7 +326,7 @@ def appointment_list(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsReceptionist | IsDoctor])
+@permission_classes([IsAuthenticated, IsReceptionist | IsAdmin])
 def update_appointment_status(request, appointment_id):
     
     appointment = get_object_or_404(Appointment, pk=appointment_id)

@@ -22,8 +22,6 @@ class ConsultationRecordSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-
-
 class UserBasicSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
@@ -38,14 +36,23 @@ class PatientBasicSerializer(serializers.ModelSerializer):
         fields = ['id', 'user', 'phone_number']
 
 
+
+
+class DoctorBasicSerializer(serializers.ModelSerializer):
+    user = UserBasicSerializer(read_only=True)
+
+    class Meta:
+        model = DoctorProfile
+        fields = ['id', 'user', 'specialty', 'session_duration']
+
 class AppointmentSerializer(serializers.ModelSerializer):
     patient = PatientBasicSerializer(read_only=True)
+    doctor = DoctorBasicSerializer(read_only=True) 
 
     class Meta:
         model = Appointment
         fields = [
-            'id', 'patient', 'scheduled_datetime',
-            'status', 'check_in_time',
-            'is_telemedicine', 'meeting_link',
+            'id', 'patient', 'doctor', 
+            'scheduled_datetime', 'status',
+            'check_in_time', 'is_telemedicine', 'meeting_link',
         ]
-

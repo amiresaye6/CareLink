@@ -14,6 +14,7 @@ class SignUpDoctorSerializer(serializers.Serializer):
     specialty = serializers.ChoiceField(choices=DoctorProfile.SPECIALTY_CHOICES, required=True, write_only=True)
     session_duration = serializers.ChoiceField(choices=DoctorProfile.SESSION_CHOICES, required=True, write_only=True)
     buffer_time = serializers.IntegerField(required=True,write_only=True)
+    session_price = serializers.IntegerField(required=True,write_only=True)
 
     def create(self, validated_data):
         user = User.objects.create_user(
@@ -33,7 +34,8 @@ class SignUpDoctorSerializer(serializers.Serializer):
             user = user,
             specialty = validated_data['specialty'],
             session_duration = validated_data['session_duration'],
-            buffer_time = validated_data['buffer_time']
+            buffer_time = validated_data['buffer_time'],
+            session_price = validated_data['session_price']
         )
         return user
 
@@ -154,7 +156,6 @@ class SignUpUserSerializer(serializers.ModelSerializer):
 ###############################################################
 ###############################################################
 
-
 class DoctorProfileSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(source='user.first_name', read_only=True)
     last_name = serializers.CharField(source='user.last_name', read_only=True)
@@ -164,8 +165,30 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DoctorProfile
-        fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role', 'specialty', 'session_duration', 'buffer_time']
+        fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role',
+                  'specialty', 'session_duration', 'buffer_time', 'session_price']
 
+    def to_internal_value(self, data):
+        internal = super().to_internal_value(data)
+        user_fields = ['first_name', 'last_name', 'username', 'email']
+        user_data = {}
+        for field in user_fields:
+            if field in data:
+                user_data[field] = data[field]
+        if user_data:
+            internal['user'] = user_data
+        return internal
+
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop('user', {})
+        user = instance.user
+        for attr, value in user_data.items():
+            setattr(user, attr, value)
+        user.save()
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
 
 
 class PatientProfileSerializer(serializers.ModelSerializer):
@@ -177,8 +200,30 @@ class PatientProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PatientProfile
-        fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role', 'date_of_birth', 'phone_number', 'medical_history']
+        fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role',
+                  'date_of_birth', 'phone_number', 'medical_history']
 
+    def to_internal_value(self, data):
+        internal = super().to_internal_value(data)
+        user_fields = ['first_name', 'last_name', 'username', 'email']
+        user_data = {}
+        for field in user_fields:
+            if field in data:
+                user_data[field] = data[field]
+        if user_data:
+            internal['user'] = user_data
+        return internal
+
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop('user', {})
+        user = instance.user
+        for attr, value in user_data.items():
+            setattr(user, attr, value)
+        user.save()
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
 
 
 class ReceptionistProfileSerializer(serializers.ModelSerializer):
@@ -191,15 +236,35 @@ class ReceptionistProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ReceptionistProfile
-        fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role', 'doctor', 'doctor_name']
+        fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role',
+                  'doctor', 'doctor_name']
+
+    def to_internal_value(self, data):
+        internal = super().to_internal_value(data)
+        user_fields = ['first_name', 'last_name', 'username', 'email']
+        user_data = {}
+        for field in user_fields:
+            if field in data:
+                user_data[field] = data[field]
+        if user_data:
+            internal['user'] = user_data
+        return internal
+
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop('user', {})
+        user = instance.user
+        for attr, value in user_data.items():
+            setattr(user, attr, value)
+        user.save()
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+    
 
 
 
 class AdminProfileSerializer(serializers.ModelSerializer):
-    username = serializers.CharField(source='user.username', read_only=True)
-    email = serializers.EmailField(source='user.email', read_only=True)
-    role = serializers.CharField(source='user.role', read_only=True)
-
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role']
@@ -209,3 +274,9 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role','is_active', 'date_joined']
+
+
+class changePasswordSerializer(serializers.Serializer):
+    oldPassword = serializers.CharField(required=True)
+    newPassword = serializers.CharField(required=True,min_length=8)
+    repeatNewPssword = serializers.CharField(required=True,min_length=8)

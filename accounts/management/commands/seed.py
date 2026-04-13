@@ -111,6 +111,30 @@ class Command(BaseCommand):
             scheduled_datetime=make_slot(today, 9, 0),
             status='NO_SHOW'
         )
+        # 1. حالة منتظرة (CONFIRMED) - لسه موصلش
+        Appointment.objects.create(
+            patient=prof_sara, 
+            doctor=prof_donia, 
+            scheduled_datetime=make_slot(today, 14, 0), # الساعة 2 ظهراً
+            status='CONFIRMED'
+        )
+
+        # 2. حالة في غرفة الكشف حالياً (CHECKED_IN) - بقاله 10 دقائق
+        Appointment.objects.create(
+            patient=prof_amir_m, 
+            doctor=prof_donia, 
+            scheduled_datetime=make_slot(today, 13, 30), 
+            status='CHECKED_IN',
+            check_in_time=now - timedelta(minutes=10)
+        )
+
+        # 3. حجز متأخر شوية (Delayed)
+        Appointment.objects.create(
+            patient=prof_khaled, 
+            doctor=prof_donia, 
+            scheduled_datetime=make_slot(today, 15, 0), 
+            status='CONFIRMED'
+        )
 
         # D. Future Appointment -> CONFIRMED (Also test Telemedicine)
         app_future = Appointment.objects.create(

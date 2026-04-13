@@ -158,7 +158,6 @@ def _patient_has_overlapping_appointment(patient, start_dt, end_dt):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsDoctorOrReceptionist])
 def doctor_appointment_details(request, id):
-    # Doctors can only view their own availability; receptionists can only view their assigned doctor.
     if IsDoctor().has_permission(request, None):
         try:
             if request.user.doctor_profile.id != id:
@@ -295,16 +294,24 @@ def today_queue(request):
     
     today = timezone.localdate()
 
-    appointments = (
-        Appointment.objects
-        .filter(scheduled_datetime__date=today)
-        .exclude(status__in=['CANCELLED', 'NO_SHOW'])
-        .select_related(
-            'patient__user',
-            'doctor__user',
+    try:
+        if request.user.role == 'RECEPTIONIST':
+            doctor = request.user.receptionist_profile.doctor
+        else:
+            doctor = request.user.doctor_profile
+
+        appointments = Appointment.objects.filter(
+            scheduled_datetime__date=today,
+            doctor=doctor
         )
-        .order_by('check_in_time', 'scheduled_datetime')
-    )
+    except:
+        appointments = Appointment.objects.filter(scheduled_datetime__date=today)
+    
+    appointments = appointments.exclude(
+        status__in=['CANCELLED', 'NO_SHOW']
+    ).select_related(
+        'patient__user', 'doctor__user'
+    ).order_by('check_in_time', 'scheduled_datetime')
 
     serializer = QueueSerializer(appointments, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
@@ -314,17 +321,27 @@ def today_queue(request):
 @permission_classes([IsReceptionist])
 def appointment_list(request):
 
-    appointments = (
-        Appointment.objects
-        .select_related('patient__user', 'doctor__user')
-        .all()
-        .order_by('-scheduled_datetime')
-    )
+    try:
+        doctor = request.user.receptionist_profile.doctor
+        appointments = Appointment.objects.filter(doctor=doctor)
+    except:
+        appointments = Appointment.objects.all()
+
+    appointments = appointments.select_related(
+        'patient__user', 'doctor__user'
+    ).order_by('-scheduled_datetime')
 
     status_filter  = request.query_params.get('status')
     date_filter    = request.query_params.get('date')
     doctor_filter  = request.query_params.get('doctor')
-    patient_filter = request.query_params.get('patient')
+    search_query = request.query_params.get('search') or request.query_params.get('patient')
+
+    if search_query:
+        appointments = appointments.filter(
+            Q(patient__user__username__icontains=search_query) |
+            Q(patient__user__first_name__icontains=search_query) |
+            Q(patient__user__last_name__icontains=search_query)
+        )
 
     if status_filter:
         appointments = appointments.filter(status=status_filter.upper())
@@ -332,9 +349,6 @@ def appointment_list(request):
         appointments = appointments.filter(scheduled_datetime__date=date_filter)
     if doctor_filter:
         appointments = appointments.filter(doctor__id=doctor_filter)
-    if patient_filter:
-        appointments = appointments.filter(patient__id=patient_filter)
-
     serializer = AppointmentListSerializer(appointments, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 

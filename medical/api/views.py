@@ -319,3 +319,48 @@ def doctor_tests(request):
     paginated = paginator.paginate_queryset(tests, request)
     serializer = TestRequestSerializer(paginated, many=True)
     return paginator.get_paginated_response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsPatient])
+def patient_appointments(request):
+    appointments = Appointment.objects.filter(
+        patient=request.user.patient_profile
+    )
+
+    status_filter = request.query_params.get('status')
+    if status_filter:
+        appointments = appointments.filter(status=status_filter)
+
+    ordering = request.query_params.get('ordering', '-scheduled_datetime')
+    appointments = appointments.order_by(ordering)
+
+    paginator = MedicalPagination()
+    paginated = paginator.paginate_queryset(appointments, request)
+    serializer = AppointmentSerializer(paginated, many=True)
+    return paginator.get_paginated_response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsDoctor])
+def doctor_consultation_history(request):
+    consultations = ConsultationRecord.objects.filter(
+        appointment__doctor=request.user.doctor_profile
+    )
+
+    search = request.query_params.get('search')
+    if search:
+        consultations = consultations.filter(
+            appointment__patient__user__first_name__icontains=search
+        ) | consultations.filter(
+            appointment__patient__user__last_name__icontains=search
+        ) | consultations.filter(
+            diagnosis__icontains=search
+        )
+
+    ordering = request.query_params.get('ordering', '-appointment__scheduled_datetime')
+    consultations = consultations.order_by(ordering)
+
+    paginator = MedicalPagination()
+    paginated = paginator.paginate_queryset(consultations, request)
+    serializer = ConsultationRecordSerializer(paginated, many=True)
+    return paginator.get_paginated_response(serializer.data)

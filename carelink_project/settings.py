@@ -67,7 +67,6 @@ INSTALLED_APPS = [
     'medical.apps.MedicalConfig',
     'dashboard.apps.DashboardConfig',
     'rest_framework.authtoken',
-    'corsheaders',
 ]
 
 MIDDLEWARE = [

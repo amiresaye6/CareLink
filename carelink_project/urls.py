@@ -11,7 +11,6 @@ urlpatterns = [
     path('api/medical/', include('medical.api.urls')),
     path('api/appointments/', include('appointments.api.urls')),
     path('api/dashboard/', include('dashboard.api.urls')),
-    path('api/medical/', include('medical.api.urls')),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

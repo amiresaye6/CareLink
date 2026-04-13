@@ -139,7 +139,6 @@ class MedicalPagination(PageNumberPagination):
 
 @api_view(['GET'])
 @permission_classes([IsDoctor])
-#@permission_classes([IsAuthenticated])
 def doctor_queue(request):
     today = timezone.now().date()
     appointments = Appointment.objects.filter(
@@ -191,7 +190,6 @@ def _replace_consultation_children(consultation, prescriptions_data, tests_data)
 
 @api_view(['POST'])
 @permission_classes([IsDoctor])
-# @permission_classes([IsAuthenticated])
 def save_consultation(request, appointment_id):
     appointment = get_object_or_404(Appointment, pk=appointment_id)
 
@@ -282,7 +280,6 @@ def edit_consultation(request, appointment_id):
 
 @api_view(['GET'])
 @permission_classes([IsDoctor])
-#@permission_classes([IsAuthenticated])
 def get_consultation(request, appointment_id):
     appointment = get_object_or_404(Appointment, pk=appointment_id)
 
@@ -304,7 +301,6 @@ def get_consultation(request, appointment_id):
 
 @api_view(['GET'])
 @permission_classes([IsPatient])
-#@permission_classes([IsAuthenticated])
 def patient_consultation_summary(request, appointment_id):
     appointment = get_object_or_404(Appointment, pk=appointment_id)
 
@@ -326,7 +322,6 @@ def patient_consultation_summary(request, appointment_id):
 
 @api_view(['GET'])
 @permission_classes([IsDoctor])
-#@permission_classes([IsAuthenticated])
 def doctor_prescriptions(request):
     prescriptions = PrescriptionItem.objects.filter(
         consultation__appointment__doctor=request.user.doctor_profile
@@ -354,7 +349,6 @@ def doctor_prescriptions(request):
 
 @api_view(['GET'])
 @permission_classes([IsDoctor])
-#@permission_classes([IsAuthenticated])
 def doctor_tests(request):
     tests = TestRequest.objects.filter(
         consultation__appointment__doctor=request.user.doctor_profile

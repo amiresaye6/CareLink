@@ -705,6 +705,34 @@ def doctor_dashboard_stats(request):
     confirmed_today = base.filter(status='CONFIRMED', scheduled_datetime__date=today).count()
     waiting_now = checked_in_today
 
+    
+    session_price = int(getattr(doctor, 'session_price', 0) or 0)
+    completed_this_month = base.filter(status='COMPLETED', scheduled_datetime__date__gte=first_of_month).count()
+    revenue_total = completed_total * session_price
+    revenue_this_month = completed_this_month * session_price
+    revenue_today = completed_today * session_price
+
+    first_of_last_month = (first_of_month - timedelta(days=1)).replace(day=1)
+    last_day_last_month = first_of_month - timedelta(days=1)
+    completed_last_month = base.filter(
+        status='COMPLETED',
+        scheduled_datetime__date__gte=first_of_last_month,
+        scheduled_datetime__date__lte=last_day_last_month,
+    ).count()
+    revenue_last_month = completed_last_month * session_price
+    if revenue_last_month > 0:
+        revenue_mom_change_percent = round(
+            100.0 * (revenue_this_month - revenue_last_month) / revenue_last_month,
+            1,
+        )
+    elif revenue_this_month > 0:
+        revenue_mom_change_percent = None
+    else:
+        revenue_mom_change_percent = 0.0
+
+    non_cancelled = base.exclude(status='CANCELLED').count()
+    completion_rate = round((100.0 * completed_total / non_cancelled), 1) if non_cancelled else 0.0
+
     return Response(
         {
             'total_appointments': total_appointments,
@@ -720,6 +748,15 @@ def doctor_dashboard_stats(request):
             'pending_requests': pending_requests,
             'confirmed_today': confirmed_today,
             'currently_waiting': waiting_now,
+            'session_price': session_price,
+            'revenue_total': revenue_total,
+            'revenue_this_month': revenue_this_month,
+            'revenue_today': revenue_today,
+            'revenue_last_month': revenue_last_month,
+            'revenue_mom_change_percent': revenue_mom_change_percent,
+            'completed_this_month': completed_this_month,
+            'completed_last_month': completed_last_month,
+            'completion_rate': completion_rate,
         }
     )
 
@@ -734,17 +771,29 @@ def doctor_appointments_over_time(request):
     period = (request.query_params.get('period') or '7d').strip().lower()
     days = {'7d': 7, '30d': 30, '90d': 90}.get(period, 7)
     today = timezone.localdate()
+    session_price = int(getattr(doctor, 'session_price', 0) or 0)
     points = []
     for i in range(days - 1, -1, -1):
         d = today - timedelta(days=i)
-        c = Appointment.objects.filter(doctor=doctor, scheduled_datetime__date=d).count()
+        day_qs = Appointment.objects.filter(doctor=doctor, scheduled_datetime__date=d)
+        c = day_qs.count()
+        completed_c = day_qs.filter(status='COMPLETED').count()
+        revenue = completed_c * session_price
         if days <= 14:
             label = d.strftime('%a')
         else:
             label = d.strftime('%m/%d')
-        points.append({'date': d.isoformat(), 'label': label, 'count': c})
+        points.append(
+            {
+                'date': d.isoformat(),
+                'label': label,
+                'count': c,
+                'completed_count': completed_c,
+                'revenue': revenue,
+            }
+        )
 
-    return Response({'period': period, 'points': points})
+    return Response({'period': period, 'session_price': session_price, 'points': points})
 
 
 _STATUS_ORDER = (

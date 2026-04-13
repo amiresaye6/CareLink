@@ -124,7 +124,7 @@ def reset_password_request(request):
     user = User.objects.get(email=email)
     token= default_token_generator.make_token(user)
     uid = urlsafe_base64_encode(force_bytes(user.pk))
-    reset_link = f"http://localhost:4200/reset-password?uid={uid}&token={token}"
+    reset_link = f"http://localhost:4200/auth/reset-password?uid={uid}&token={token}"
     send_mail(
         subject='Reset Your Password',
         message=f'Click the link to reset your password: {reset_link}',

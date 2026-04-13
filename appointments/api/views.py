@@ -12,7 +12,7 @@ from accounts.models import DoctorProfile, PatientProfile
 from appointments.models import WeeklySchedule, ScheduleException, Appointment
 from appointments.api.serializers import DoctorAppointmentDetailsSerializer, BookAppointmentSerializer
 from rest_framework.permissions import IsAuthenticated , AllowAny
-from accounts.apis.permissions import IsPatient, IsDoctor, IsAdmin, IsReceptionist
+from accounts.apis.permissions import IsPatient, IsDoctor, IsAdmin, IsReceptionist, IsDoctorOrReceptionist
 from dashboard.api.doctor.views import update_logged_in_doctor_appointment_status
 
 
@@ -156,8 +156,22 @@ def _patient_has_overlapping_appointment(patient, start_dt, end_dt):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated , IsDoctor , IsAdmin])
+@permission_classes([IsAuthenticated, IsDoctorOrReceptionist])
 def doctor_appointment_details(request, id):
+    # Doctors can only view their own availability; receptionists can only view their assigned doctor.
+    if IsDoctor().has_permission(request, None):
+        try:
+            if request.user.doctor_profile.id != id:
+                return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
+        except Exception:
+            return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
+    if IsReceptionist().has_permission(request, None):
+        try:
+            if request.user.receptionist_profile.doctor.id != id:
+                return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
+        except Exception:
+            return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
+
     doctor = get_object_or_404(DoctorProfile, pk=id)
 
     now = timezone.now()

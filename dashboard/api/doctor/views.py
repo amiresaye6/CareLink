@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
-from accounts.apis.permissions import IsAdmin, IsDoctor, IsPatient
+from accounts.apis.permissions import IsAdmin, IsDoctor, IsPatient, IsReceptionist, IsDoctorOrReceptionist
 from datetime import datetime, timedelta
 
 from django.db.models import Q, Count, Min, Exists, OuterRef
@@ -35,6 +35,50 @@ def _get_logged_in_doctor(request):
         return request.user.doctor_profile
     except Exception:
         return None
+
+
+def _get_logged_in_receptionist_doctor(request):
+    try:
+        return request.user.receptionist_profile.doctor
+    except Exception:
+        return None
+
+
+def _parse_int(value):
+    try:
+        return int(value)
+    except Exception:
+        return None
+
+
+def _resolve_doctor_for_schedule(request):
+    doctor_id = (
+        request.query_params.get('doctor_id')
+        or request.data.get('doctor_id')
+        or request.query_params.get('doctor')
+        or request.data.get('doctor')
+    )
+    doctor_id = _parse_int(doctor_id) if doctor_id is not None else None
+
+    if IsDoctor().has_permission(request, None):
+        doctor = _get_logged_in_doctor(request)
+        if not doctor:
+            return None
+        if doctor_id is not None and doctor_id != doctor.id:
+            return None
+        return doctor
+
+    if IsReceptionist().has_permission(request, None):
+        assigned = _get_logged_in_receptionist_doctor(request)
+        if not assigned:
+            return None
+        if doctor_id is None:
+            return assigned
+        if doctor_id != assigned.id:
+            return None
+        return assigned
+
+    return None
 
 
 def _parse_query_date(value):
@@ -142,9 +186,9 @@ def update_logged_in_doctor(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated , IsDoctor])
+@permission_classes([IsAuthenticated, IsDoctorOrReceptionist])
 def get_logged_in_weekly_schedules(request):
-    doctor = _get_logged_in_doctor(request)
+    doctor = _resolve_doctor_for_schedule(request)
     if not doctor:
         return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
     schedules = WeeklySchedule.objects.filter(doctor=doctor).order_by('day_of_week', 'start_time')
@@ -153,9 +197,9 @@ def get_logged_in_weekly_schedules(request):
 
 
 @api_view(['PUT'])
-@permission_classes([IsAuthenticated , IsDoctor])
+@permission_classes([IsAuthenticated, IsDoctorOrReceptionist])
 def update_logged_in_weekly_schedule(request, id):
-    doctor = _get_logged_in_doctor(request)
+    doctor = _resolve_doctor_for_schedule(request)
     if not doctor:
         return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
     schedule = get_object_or_404(WeeklySchedule, pk=id, doctor=doctor)
@@ -167,9 +211,9 @@ def update_logged_in_weekly_schedule(request, id):
 
 
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated , IsDoctor])
+@permission_classes([IsAuthenticated, IsDoctorOrReceptionist])
 def delete_logged_in_weekly_schedule(request, id):
-    doctor = _get_logged_in_doctor(request)
+    doctor = _resolve_doctor_for_schedule(request)
     if not doctor:
         return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
     schedule = get_object_or_404(WeeklySchedule, pk=id, doctor=doctor)
@@ -178,9 +222,9 @@ def delete_logged_in_weekly_schedule(request, id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated , IsDoctor])
+@permission_classes([IsAuthenticated, IsDoctorOrReceptionist])
 def create_logged_in_weekly_schedule(request):
-    doctor = _get_logged_in_doctor(request)
+    doctor = _resolve_doctor_for_schedule(request)
     if not doctor:
         return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
     schedule = WeeklyScheduleModelSerializer(data=request.data)
@@ -210,9 +254,9 @@ def create_logged_in_weekly_schedule(request):
 
 
 @api_view(['POST', 'PUT'])
-@permission_classes([IsAuthenticated , IsDoctor])
+@permission_classes([IsAuthenticated, IsDoctorOrReceptionist])
 def bulk_set_logged_in_weekly_schedules(request):
-    doctor = _get_logged_in_doctor(request)
+    doctor = _resolve_doctor_for_schedule(request)
     if not doctor:
         return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
 
@@ -242,9 +286,9 @@ def bulk_set_logged_in_weekly_schedules(request):
 
 
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated , IsDoctor])
+@permission_classes([IsAuthenticated, IsDoctorOrReceptionist])
 def bulk_delete_logged_in_weekly_schedules(request):
-    doctor = _get_logged_in_doctor(request)
+    doctor = _resolve_doctor_for_schedule(request)
     if not doctor:
         return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
 
@@ -263,9 +307,9 @@ def bulk_delete_logged_in_weekly_schedules(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated , IsDoctor])
+@permission_classes([IsAuthenticated, IsDoctorOrReceptionist])
 def get_logged_in_schedule_exceptions(request):
-    doctor = _get_logged_in_doctor(request)
+    doctor = _resolve_doctor_for_schedule(request)
     if not doctor:
         return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
     exc = ScheduleException.objects.filter(doctor=doctor).order_by('date')
@@ -274,9 +318,9 @@ def get_logged_in_schedule_exceptions(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated , IsDoctor])
+@permission_classes([IsAuthenticated, IsDoctorOrReceptionist])
 def create_logged_in_schedule_exception(request):
-    doctor = _get_logged_in_doctor(request)
+    doctor = _resolve_doctor_for_schedule(request)
     if not doctor:
         return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
     exc = ScheduleExceptionModelSerializer(data=request.data)
@@ -304,9 +348,9 @@ def create_logged_in_schedule_exception(request):
 
 
 @api_view(['PUT'])
-@permission_classes([IsAuthenticated , IsDoctor])
+@permission_classes([IsAuthenticated, IsDoctorOrReceptionist])
 def update_logged_in_schedule_exception(request, id):
-    doctor = _get_logged_in_doctor(request)
+    doctor = _resolve_doctor_for_schedule(request)
     if not doctor:
         return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
     exc = get_object_or_404(ScheduleException, pk=id, doctor=doctor)
@@ -318,9 +362,9 @@ def update_logged_in_schedule_exception(request, id):
 
 
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated , IsDoctor ])
+@permission_classes([IsAuthenticated, IsDoctorOrReceptionist])
 def delete_logged_in_schedule_exception(request, id):
-    doctor = _get_logged_in_doctor(request)
+    doctor = _resolve_doctor_for_schedule(request)
     if not doctor:
         return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
     exc = get_object_or_404(ScheduleException, pk=id, doctor=doctor)

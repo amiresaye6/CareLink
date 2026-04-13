@@ -282,16 +282,24 @@ def today_queue(request):
     
     today = timezone.localdate()
 
-    appointments = (
-        Appointment.objects
-        .filter(scheduled_datetime__date=today)
-        .exclude(status__in=['CANCELLED', 'NO_SHOW'])
-        .select_related(
-            'patient__user',
-            'doctor__user',
+    try:
+        if request.user.role == 'RECEPTIONIST':
+            doctor = request.user.receptionist_profile.doctor
+        else:
+            doctor = request.user.doctor_profile
+
+        appointments = Appointment.objects.filter(
+            scheduled_datetime__date=today,
+            doctor=doctor
         )
-        .order_by('check_in_time', 'scheduled_datetime')
-    )
+    except:
+        appointments = Appointment.objects.filter(scheduled_datetime__date=today)
+
+    appointments = appointments.exclude(
+        status__in=['CANCELLED', 'NO_SHOW']
+    ).select_related(
+        'patient__user', 'doctor__user'
+    ).order_by('check_in_time', 'scheduled_datetime')
 
     serializer = QueueSerializer(appointments, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
@@ -301,12 +309,15 @@ def today_queue(request):
 @permission_classes([IsReceptionist])
 def appointment_list(request):
 
-    appointments = (
-        Appointment.objects
-        .select_related('patient__user', 'doctor__user')
-        .all()
-        .order_by('-scheduled_datetime')
-    )
+    try:
+        doctor = request.user.receptionist_profile.doctor
+        appointments = Appointment.objects.filter(doctor=doctor)
+    except:
+        appointments = Appointment.objects.all()
+
+    appointments = appointments.select_related(
+        'patient__user', 'doctor__user'
+    ).order_by('-scheduled_datetime')
 
     status_filter  = request.query_params.get('status')
     date_filter    = request.query_params.get('date')

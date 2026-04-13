@@ -274,6 +274,7 @@ from appointments.api.serializers import (
     AppointmentListSerializer,
     AppointmentStatusUpdateSerializer,
 )
+from django.db.models import Q
 from accounts.apis.permissions import IsReceptionist, IsDoctor
 
 @api_view(['GET'])
@@ -294,7 +295,7 @@ def today_queue(request):
         )
     except:
         appointments = Appointment.objects.filter(scheduled_datetime__date=today)
-
+    
     appointments = appointments.exclude(
         status__in=['CANCELLED', 'NO_SHOW']
     ).select_related(
@@ -322,7 +323,14 @@ def appointment_list(request):
     status_filter  = request.query_params.get('status')
     date_filter    = request.query_params.get('date')
     doctor_filter  = request.query_params.get('doctor')
-    patient_filter = request.query_params.get('patient')
+    search_query = request.query_params.get('search') or request.query_params.get('patient')
+
+    if search_query:
+        appointments = appointments.filter(
+            Q(patient__user__username__icontains=search_query) |
+            Q(patient__user__first_name__icontains=search_query) |
+            Q(patient__user__last_name__icontains=search_query)
+        )
 
     if status_filter:
         appointments = appointments.filter(status=status_filter.upper())
@@ -330,9 +338,6 @@ def appointment_list(request):
         appointments = appointments.filter(scheduled_datetime__date=date_filter)
     if doctor_filter:
         appointments = appointments.filter(doctor__id=doctor_filter)
-    if patient_filter:
-        appointments = appointments.filter(patient__id=patient_filter)
-
     serializer = AppointmentListSerializer(appointments, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 

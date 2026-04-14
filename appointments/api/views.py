@@ -12,7 +12,7 @@ from accounts.models import DoctorProfile, PatientProfile
 from appointments.models import WeeklySchedule, ScheduleException, Appointment
 from appointments.api.serializers import DoctorAppointmentDetailsSerializer, BookAppointmentSerializer
 from rest_framework.permissions import IsAuthenticated , AllowAny
-from accounts.apis.permissions import IsPatient, IsDoctor, IsAdmin, IsReceptionist, IsDoctorOrReceptionist
+from accounts.apis.permissions import IsPatient, IsDoctor, IsAdmin, IsReceptionist
 from dashboard.api.doctor.views import update_logged_in_doctor_appointment_status
 
 
@@ -135,43 +135,158 @@ def _generate_available_slots(doctor, range_start, range_end):
     return slots
 
 
+def _doctor_display_name(doctor):
+    u = doctor.user
+    fn = (u.first_name or '').strip()
+    ln = (u.last_name or '').strip()
+    if fn or ln:
+        return f'Dr. {fn} {ln}'.strip()
+    return f'Dr. {u.username}'
+
+
+def _appointment_interval_end(appt):
+    dur = int(appt.doctor.session_duration or 30)
+    return appt.scheduled_datetime + timedelta(minutes=dur)
+
+
+def _patient_active_same_doctor_appointment(patient, doctor, now):
+    """
+    Another visit with this doctor is not allowed while an existing appointment
+    with this doctor is still upcoming or in progress (interval end > now).
+    """
+    qs = (
+        Appointment.objects.filter(patient=patient, doctor=doctor)
+        .exclude(status='CANCELLED')
+        .select_related('doctor', 'doctor__user')
+        .order_by('scheduled_datetime')
+    )
+    for appt in qs:
+        if _appointment_interval_end(appt) > now:
+            return appt
+    return None
+
+
 def _patient_has_overlapping_appointment(patient, start_dt, end_dt):
-    max_reasonable_session = timedelta(hours=48)
-    window_start = start_dt - max_reasonable_session
+    """
+    True if [start_dt, end_dt) overlaps any existing non-cancelled appointment
+    interval (any doctor), using each doctor's session duration.
+    Ignores visits that have already ended.
+    """
+    now = timezone.now()
+    max_dur = timedelta(hours=6)
     qs = (
         Appointment.objects.filter(
             patient=patient,
-            scheduled_datetime__gte=window_start,
             scheduled_datetime__lt=end_dt,
+            scheduled_datetime__gt=start_dt - max_dur,
         )
         .exclude(status='CANCELLED')
         .select_related('doctor')
     )
     for appt in qs:
-        dur = int(appt.doctor.session_duration or 30)
-        appt_end = appt.scheduled_datetime + timedelta(minutes=dur)
+        appt_end = _appointment_interval_end(appt)
+        if appt_end <= now:
+            continue
         if start_dt < appt_end and end_dt > appt.scheduled_datetime:
             return True
     return False
 
 
+def _patient_busy_intervals(patient, range_start, range_end):
+    """Upcoming non-cancelled appointment intervals overlapping the requested window (any doctor)."""
+    intervals = []
+    now = timezone.now()
+    qs = (
+        Appointment.objects.filter(
+            patient=patient,
+            scheduled_datetime__lt=range_end,
+        )
+        .exclude(status='CANCELLED')
+        .select_related('doctor', 'doctor__user')
+        .order_by('scheduled_datetime')
+    )
+    for appt in qs:
+        appt_end = _appointment_interval_end(appt)
+        if appt_end <= now:
+            continue
+        if appt_end <= range_start or appt.scheduled_datetime >= range_end:
+            continue
+        intervals.append(
+            {
+                'scheduled_datetime': appt.scheduled_datetime,
+                'ends_at': appt_end,
+                'doctor_id': appt.doctor_id,
+                'doctor_name': _doctor_display_name(appt.doctor),
+            }
+        )
+    return intervals
+
+
+def _filter_slots_for_patient(slots, patient, doctor, duration_min):
+    """Remove slots that overlap the patient's other appointments (any doctor)."""
+    if not slots:
+        return []
+    out = []
+    for slot in slots:
+        end_slot = slot + timedelta(minutes=duration_min)
+        if not _patient_has_overlapping_appointment(patient, slot, end_slot):
+            out.append(slot)
+    return out
+
+
+def _build_patient_booking_for_response(patient, doctor, slots, range_start, range_end, now):
+    """Returns (filtered_available_slots, patient_booking_dict) for GET doctor details."""
+    active_same = _patient_active_same_doctor_appointment(patient, doctor, now)
+    if active_same:
+        appt_end = _appointment_interval_end(active_same)
+        pb = {
+            'can_book_with_this_doctor': False,
+            'same_doctor_block': {
+                'active': True,
+                'scheduled_datetime': active_same.scheduled_datetime,
+                'ends_at': appt_end,
+                'message': (
+                    'You already have an upcoming or in-progress visit with this doctor. '
+                    'You can book again after that appointment has finished.'
+                ),
+            },
+            'busy_intervals': _patient_busy_intervals(patient, range_start, range_end),
+        }
+        return [], pb
+
+    duration_min = int(doctor.session_duration or 30)
+    filtered = _filter_slots_for_patient(slots, patient, doctor, duration_min)
+    pb = {
+        'can_book_with_this_doctor': True,
+        'same_doctor_block': None,
+        'busy_intervals': _patient_busy_intervals(patient, range_start, range_end),
+    }
+    return filtered, pb
+
+
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsDoctorOrReceptionist])
+@permission_classes([IsAuthenticated])
 def doctor_appointment_details(request, id):
-    if IsDoctor().has_permission(request, None):
+    is_doctor = IsDoctor().has_permission(request, None)
+    is_receptionist = IsReceptionist().has_permission(request, None)
+    is_patient = IsPatient().has_permission(request, None)
+    if not (is_doctor or is_receptionist or is_patient):
+        return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
+
+    if is_doctor:
         try:
             if request.user.doctor_profile.id != id:
                 return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
         except Exception:
             return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
-    if IsReceptionist().has_permission(request, None):
+    elif is_receptionist:
         try:
             if request.user.receptionist_profile.doctor.id != id:
                 return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
         except Exception:
             return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
 
-    doctor = get_object_or_404(DoctorProfile, pk=id)
+    doctor = get_object_or_404(DoctorProfile.objects.select_related('user'), pk=id)
 
     now = timezone.now()
 
@@ -189,6 +304,14 @@ def doctor_appointment_details(request, id):
 
     available_slots = _generate_available_slots(doctor, range_start, range_end)
 
+    patient_booking = None
+    if is_patient:
+        patient = _get_logged_in_patient(request)
+        if patient:
+            available_slots, patient_booking = _build_patient_booking_for_response(
+                patient, doctor, available_slots, range_start, range_end, now
+            )
+
     data = {
         'doctor': doctor,
         'weekly_schedules': WeeklySchedule.objects.filter(doctor=doctor).order_by('day_of_week', 'start_time'),
@@ -199,6 +322,7 @@ def doctor_appointment_details(request, id):
         'available_slots': available_slots,
         'session_duration': int(doctor.session_duration or 30),
         'buffer_time': int(doctor.buffer_time or 0),
+        'patient_booking': patient_booking,
     }
 
     serializer = DoctorAppointmentDetailsSerializer(instance=data)
@@ -237,10 +361,35 @@ def book_appointment(request, doctor_id):
 
         duration_min = int(doctor.session_duration or 30)
         end_dt = scheduled_dt + timedelta(minutes=duration_min)
+        now = timezone.now()
+
+        if _patient_active_same_doctor_appointment(patient_locked, doctor, now):
+            return Response(
+                {
+                    'message': 'not valid',
+                    'code': 'same_doctor_pending',
+                    'errors': {
+                        'scheduled_datetime': [
+                            'You already have an upcoming or in-progress visit with this doctor. '
+                            'Wait until it finishes before booking another.'
+                        ],
+                    },
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if _patient_has_overlapping_appointment(patient_locked, scheduled_dt, end_dt):
             return Response(
-                {'message': 'not valid', 'errors': {'scheduled_datetime': ['Patient has overlapping appointment']}},
+                {
+                    'message': 'not valid',
+                    'code': 'time_overlap',
+                    'errors': {
+                        'scheduled_datetime': [
+                            'This time overlaps another visit you already booked (including the full '
+                            'session length). Choose a different time.'
+                        ],
+                    },
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -277,7 +426,7 @@ def book_appointment(request, doctor_id):
 
 
 @api_view(['PATCH'])
-@permission_classes([IsAuthenticated, IsDoctor , IsAdmin])
+@permission_classes([IsAuthenticated, IsDoctor])
 def doctor_patch_appointment(request, appointment_id):
     return update_logged_in_doctor_appointment_status(request, appointment_id)
 

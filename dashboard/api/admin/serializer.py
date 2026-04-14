@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from django.core.exceptions import ObjectDoesNotExist
+
 from accounts.models import User, PatientProfile, DoctorProfile, ReceptionistProfile
 
 class PatientProfileSerializer(serializers.ModelSerializer):
@@ -94,7 +96,8 @@ class UserListSerializer(serializers.ModelSerializer):
     )
     
     full_name = serializers.SerializerMethodField(method_name='get_full_name')
-    
+    doctor_profile_id = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
@@ -108,8 +111,17 @@ class UserListSerializer(serializers.ModelSerializer):
             'role_display',
             'is_active',
             'date_joined',
+            'doctor_profile_id',
         ]
-    
+
+    def get_doctor_profile_id(self, obj):
+        if getattr(obj, 'role', None) != 'DOCTOR':
+            return None
+        try:
+            return obj.doctor_profile.id
+        except ObjectDoesNotExist:
+            return None
+
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}"
 

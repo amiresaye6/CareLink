@@ -10,10 +10,24 @@ class DoctorProfileModelSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     email = serializers.EmailField(source='user.email', read_only=True)
     role = serializers.CharField(source='user.role', read_only=True)
+    first_name = serializers.CharField(source='user.first_name', read_only=True)
+    last_name = serializers.CharField(source='user.last_name', read_only=True)
+    specialty_display = serializers.CharField(source='get_specialty_display', read_only=True)
 
     class Meta:
         model = DoctorProfile
-        fields = ['id', 'username', 'email', 'role', 'specialty', 'session_duration', 'buffer_time']
+        fields = [
+            'id',
+            'username',
+            'email',
+            'role',
+            'first_name',
+            'last_name',
+            'specialty',
+            'specialty_display',
+            'session_duration',
+            'buffer_time',
+        ]
         read_only_fields = ('id',)
 
     def create(self, validated_data):
@@ -294,24 +308,7 @@ class DoctorUpdateAppointmentStatusSerializer(serializers.Serializer):
 
     def validate_status(self, value):
         value = (value or '').strip().upper()
-        appt = self.context.get('appointment')
-        current = getattr(appt, 'status', None) if appt is not None else None
-
-        if value == 'CHECKED_IN':
-            if current not in ('COMPLETED', 'NO_SHOW'):
-                raise serializers.ValidationError(
-                    'Doctors cannot set initial check-in from here (reception does that). '
-                    'You may set Checked in only when correcting from Completed or No-show.'
-                )
-            return value
-        if value == 'REQUESTED':
-            if current != 'CONFIRMED':
-                raise serializers.ValidationError(
-                    'Return to Requested is only allowed from Confirmed.'
-                )
-            return value
-
-        allowed_targets = {'CONFIRMED', 'COMPLETED', 'NO_SHOW', 'CANCELLED'}
+        allowed_targets = {'REQUESTED', 'CONFIRMED', 'CHECKED_IN', 'COMPLETED', 'CANCELLED', 'NO_SHOW'}
         if value not in allowed_targets:
             raise serializers.ValidationError('Invalid status value.')
         return value

@@ -17,6 +17,7 @@ class DoctorAppointmentDetailsSerializer(serializers.Serializer):
     available_slots = serializers.ListField(child=serializers.DateTimeField(), read_only=True)
     session_duration = serializers.IntegerField(read_only=True)
     buffer_time = serializers.IntegerField(read_only=True)
+    patient_booking = serializers.JSONField(read_only=True, required=False, allow_null=True)
 
 
 class BookAppointmentSerializer(serializers.Serializer):

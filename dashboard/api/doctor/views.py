@@ -580,55 +580,41 @@ def update_logged_in_doctor_appointment_status(request, appointment_id):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    visit_cycle = {'CHECKED_IN', 'COMPLETED', 'NO_SHOW'}
 
-    if current == 'REQUESTED':
-        if new_status not in ('CONFIRMED', 'CANCELLED'):
-            return Response(
-                {
-                    'message': 'not valid',
-                    'errors': {
-                        'status': [
-                            'From REQUESTED: confirm (CONFIRMED) or decline (CANCELLED). '
-                            'You cannot check in from here—reception sets CHECKED_IN after the visit is confirmed. '
-                            'Or delete the request while it is still REQUESTED.',
-                        ]
-                    },
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-    elif current == 'CONFIRMED':
-        if new_status not in ('NO_SHOW', 'REQUESTED'):
-            return Response(
-                {
-                    'message': 'not valid',
-                    'errors': {
-                        'status': [
-                            'From CONFIRMED: mark no-show (NO_SHOW), move back to requested (REQUESTED), '
-                            'or wait for reception to check the patient in (CHECKED_IN).',
-                        ]
-                    },
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-    elif current in visit_cycle and new_status in visit_cycle:
-        if new_status == 'COMPLETED':
-            if not _consultation_record_complete(appt):
-                return Response(
-                    {
-                        'message': 'not valid',
-                        'errors': {'status': ['COMPLETED requires a completed consultation record (diagnosis and clinical notes)']},
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-    else:
+    if current == 'REQUESTED' and new_status not in ('CONFIRMED', 'CANCELLED'):
         return Response(
-            {'message': 'not valid', 'errors': {'status': ['Cannot update status from this state']}},
+            {'message': 'not valid', 'errors': {'status': ['From REQUESTED you can only confirm (CONFIRMED) or decline (CANCELLED).']}},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # No going back to REQUESTED once confirmed (or from any other state).
+    if current != 'REQUESTED' and new_status == 'REQUESTED':
+        return Response(
+            {'message': 'not valid', 'errors': {'status': ['Cannot return to REQUESTED after confirmation.']}},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if current == 'COMPLETED' and new_status == 'CANCELLED':
+        return Response(
+            {'message': 'not valid', 'errors': {'status': ['Cannot cancel a completed appointment']}},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if new_status == 'COMPLETED' and not _consultation_record_complete(appt):
+        return Response(
+            {
+                'message': 'not valid',
+                'errors': {'status': ['COMPLETED requires a completed consultation record (diagnosis and clinical notes)']},
+            },
             status=status.HTTP_400_BAD_REQUEST,
         )
 
     appt.status = new_status
-    appt.save(update_fields=['status'])
+    update_fields = ['status']
+    if new_status == 'CHECKED_IN' and not appt.check_in_time:
+        appt.check_in_time = timezone.now()
+        update_fields.append('check_in_time')
+    appt.save(update_fields=update_fields)
     data = DoctorAppointmentDetailSerializer(
         Appointment.objects.filter(doctor=doctor)
         .select_related('patient', 'patient__user', 'consultation')

@@ -15,6 +15,8 @@ class SignUpDoctorSerializer(serializers.Serializer):
     session_duration = serializers.ChoiceField(choices=DoctorProfile.SESSION_CHOICES, required=True, write_only=True)
     buffer_time = serializers.IntegerField(required=True,write_only=True)
     session_price = serializers.IntegerField(required=True,write_only=True)
+    profile_picture = serializers.ImageField(required=True,write_only=True) 
+
 
     def create(self, validated_data):
         user = User.objects.create_user(
@@ -35,7 +37,8 @@ class SignUpDoctorSerializer(serializers.Serializer):
             specialty = validated_data['specialty'],
             session_duration = validated_data['session_duration'],
             buffer_time = validated_data['buffer_time'],
-            session_price = validated_data['session_price']
+            session_price = validated_data['session_price'],
+            profile_picture=validated_data['profile_picture'] 
         )
         return user
 
@@ -50,6 +53,7 @@ class SignUpPatientSerializer(serializers.Serializer):
     date_of_birth = serializers.DateField(required=True, input_formats=['%Y-%m-%d'], write_only=True)
     phone_number = serializers.CharField(required=True, write_only=True)
     medical_history = serializers.CharField(required=False, write_only=True)
+    profile_picture = serializers.ImageField(required=False,write_only=True) 
 
     def create(self, validated_data):
         user = User.objects.create_user(
@@ -69,7 +73,8 @@ class SignUpPatientSerializer(serializers.Serializer):
             user = user,
             date_of_birth = validated_data['date_of_birth'],
             phone_number = validated_data['phone_number'],
-            medical_history = validated_data['medical_history']
+            medical_history = validated_data['medical_history'],
+            profile_picture=validated_data['profile_picture'] 
         )
         return user
 
@@ -82,6 +87,7 @@ class SignUpReceptionistSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True, max_length=254)
     password = serializers.CharField(write_only=True, required=True, min_length=8)
     doctor_id = serializers.IntegerField(required=True, write_only=True)
+    profile_picture = serializers.ImageField(required=False,write_only=True)
 
     def create(self, validated_data):
         try:
@@ -104,7 +110,8 @@ class SignUpReceptionistSerializer(serializers.Serializer):
 
         CreatedUser=ReceptionistProfile.objects.create(
             user=user,
-            doctor=doctor
+            doctor=doctor,
+            profile_picture=validated_data['profile_picture'] 
         )
         return user
 
@@ -162,11 +169,12 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
     username = serializers.SerializerMethodField()
     email = serializers.SerializerMethodField()
     role = serializers.SerializerMethodField()
+    profile_picture_url = serializers.SerializerMethodField()
 
     class Meta:
         model = DoctorProfile
         fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role',
-                  'specialty', 'session_duration', 'buffer_time', 'session_price']
+                  'specialty', 'session_duration', 'buffer_time', 'session_price','profile_picture_url']
 
     def get_first_name(self, obj):
         return obj.user.first_name
@@ -182,6 +190,9 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
 
     def get_role(self, obj):
         return obj.user.role
+    
+    def get_profile_picture_url(self, obj):          
+        return obj.profile_picture_url
 
     def update(self, instance, validated_data):
         user = instance.user
@@ -195,6 +206,7 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
         instance.session_duration = validated_data.get('session_duration', instance.session_duration)
         instance.buffer_time = validated_data.get('buffer_time', instance.buffer_time)
         instance.session_price = validated_data.get('session_price', instance.session_price)
+        instance.profile_picture = validated_data.get('profile_picture', instance.profile_picture)
         instance.save()
         return instance 
 
@@ -205,6 +217,7 @@ class PatientProfileSerializer(serializers.ModelSerializer):
     username = serializers.SerializerMethodField()
     email = serializers.SerializerMethodField()
     role = serializers.SerializerMethodField()
+    profile_picture_url = serializers.SerializerMethodField()
 
     class Meta:
         model = PatientProfile
@@ -225,6 +238,9 @@ class PatientProfileSerializer(serializers.ModelSerializer):
 
     def get_role(self, obj):
         return obj.user.role
+    
+    def get_profile_picture_url(self, obj):          
+        return obj.profile_picture_url
 
     def update(self, instance, validated_data):
         user = instance.user
@@ -248,6 +264,7 @@ class ReceptionistProfileSerializer(serializers.ModelSerializer):
     email = serializers.SerializerMethodField()
     role = serializers.SerializerMethodField()
     doctor_name = serializers.SerializerMethodField()
+    profile_picture_url = serializers.SerializerMethodField()
 
     class Meta:
         model = ReceptionistProfile
@@ -271,6 +288,9 @@ class ReceptionistProfileSerializer(serializers.ModelSerializer):
 
     def get_doctor_name(self, obj):
         return obj.doctor.user.username
+    
+    def get_profile_picture_url(self, obj):          
+        return obj.profile_picture_url
 
     def update(self, instance, validated_data):
         user = instance.user

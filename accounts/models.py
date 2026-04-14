@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.urls import reverse
+
 
 class User(AbstractUser):
     ROLE_CHOICES = (
@@ -14,14 +16,23 @@ class User(AbstractUser):
     def __str__(self):
         return f"{self.username} ({self.get_role_display()})"
 
+
+
 class PatientProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='patient_profile')
     date_of_birth = models.DateField(null=True, blank=True)
     phone_number = models.CharField(max_length=20, blank=True)
     medical_history = models.TextField(blank=True, null=True)
-
+    profile_picture = models.ImageField(upload_to='patients/profile_pics/', null=True, blank=True) 
+    
+    @property
+    def profile_picture_url(self):                 
+        return f'/media/{self.profile_picture}'
+    
     def __str__(self):
         return f"Patient: {self.user.username}"
+
+
 
 class DoctorProfile(models.Model):
     SESSION_CHOICES = ((15, '15 Minutes'), (30, '30 Minutes'))
@@ -38,14 +49,25 @@ class DoctorProfile(models.Model):
     session_duration = models.IntegerField(choices=SESSION_CHOICES, default=30)
     buffer_time = models.IntegerField(default=5)
     session_price = models.IntegerField(default=50)
-
+    profile_picture = models.ImageField(upload_to='doctors/profile_pics/', null=True, blank=True) 
     def __str__(self):
         return f"Dr. {self.user.username} - {self.specialty}"
+
+    @property
+    def profile_picture_url(self):                 
+        return f'/media/{self.profile_picture}'
+
+
 
 
 class ReceptionistProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='receptionist_profile')
     doctor = models.OneToOneField(DoctorProfile, on_delete=models.CASCADE, related_name='receptionist_profile')
-
+    profile_picture = models.ImageField(upload_to='receptionists/profile_pics/', null=True, blank=True) 
+    
+    @property
+    def profile_picture_url(self):                 
+        return f'/media/{self.profile_picture}'
+    
     def __str__(self):
         return f"Receptionist: {self.user.username} for Dr. {self.doctor.user.username}"

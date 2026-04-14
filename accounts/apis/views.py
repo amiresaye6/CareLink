@@ -30,7 +30,7 @@ def signup(request):
     
     serializer = None
     if role == 'DOCTOR':
-        serializer = SignUpDoctorSerializer(data=data)
+        serializer = SignUpDoctorSerializer(data=data, context={'request': request})
     elif role == 'PATIENT':
         serializer = SignUpPatientSerializer(data=data)
     elif role == 'RECEPTIONIST':

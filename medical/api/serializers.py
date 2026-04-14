@@ -41,6 +41,7 @@ class DoctorBasicSerializer(serializers.ModelSerializer):
 class AppointmentSerializer(serializers.ModelSerializer):
     patient = PatientBasicSerializer(read_only=True)
     doctor = DoctorBasicSerializer(read_only=True)
+    has_consultation = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Appointment
@@ -53,6 +54,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'check_in_time',
             'is_telemedicine',
             'meeting_link',
+            'has_consultation',
         ]
 
 

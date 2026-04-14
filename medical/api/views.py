@@ -121,6 +121,7 @@ from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 from django.db import transaction
 from django.utils import timezone
+from django.db.models import Exists, OuterRef
 from appointments.models import Appointment
 from medical.models import ConsultationRecord, PrescriptionItem, TestRequest
 from medical.api.serializers import (
@@ -415,8 +416,13 @@ def doctor_tests(request):
 @api_view(['GET'])
 @permission_classes([IsPatient])
 def patient_appointments(request):
-    appointments = Appointment.objects.filter(
-        patient=request.user.patient_profile
+    appointments = (
+        Appointment.objects.filter(patient=request.user.patient_profile)
+        .annotate(
+            has_consultation=Exists(
+                ConsultationRecord.objects.filter(appointment_id=OuterRef('pk'))
+            )
+        )
     )
 
     status_filter = request.query_params.get('status')
@@ -430,6 +436,27 @@ def patient_appointments(request):
     paginated = paginator.paginate_queryset(appointments, request)
     serializer = AppointmentSerializer(paginated, many=True)
     return paginator.get_paginated_response(serializer.data)
+
+
+@api_view(['PATCH'])
+@permission_classes([IsPatient])
+def patient_cancel_appointment(request, appointment_id):
+    appt = get_object_or_404(
+        Appointment.objects.select_related('doctor', 'doctor__user', 'patient', 'patient__user'),
+        pk=appointment_id,
+    )
+    if appt.patient != request.user.patient_profile:
+        return Response({'message': 'not allowed'}, status=status.HTTP_403_FORBIDDEN)
+
+    if appt.status not in ('REQUESTED', 'CONFIRMED'):
+        return Response(
+            {'message': 'not valid', 'errors': {'status': ['You can only cancel when status is REQUESTED or CONFIRMED']}},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    appt.status = 'CANCELLED'
+    appt.save(update_fields=['status'])
+    return Response({'message': 'cancelled', 'appointment': AppointmentSerializer(appt).data}, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])

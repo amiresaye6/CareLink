@@ -53,7 +53,6 @@ class SignUpPatientSerializer(serializers.Serializer):
     date_of_birth = serializers.DateField(required=True, input_formats=['%Y-%m-%d'], write_only=True)
     phone_number = serializers.CharField(required=True, write_only=True)
     medical_history = serializers.CharField(required=False, write_only=True)
-    profile_picture = serializers.ImageField(required=False,write_only=True) 
 
     def create(self, validated_data):
         user = User.objects.create_user(
@@ -73,8 +72,7 @@ class SignUpPatientSerializer(serializers.Serializer):
             user = user,
             date_of_birth = validated_data['date_of_birth'],
             phone_number = validated_data['phone_number'],
-            medical_history = validated_data['medical_history'],
-            profile_picture=validated_data['profile_picture'] 
+            medical_history = validated_data['medical_history']
         )
         return user
 
@@ -87,7 +85,6 @@ class SignUpReceptionistSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True, max_length=254)
     password = serializers.CharField(write_only=True, required=True, min_length=8)
     doctor_id = serializers.IntegerField(required=True, write_only=True)
-    profile_picture = serializers.ImageField(required=False,write_only=True)
 
     def create(self, validated_data):
         try:
@@ -111,7 +108,6 @@ class SignUpReceptionistSerializer(serializers.Serializer):
         CreatedUser=ReceptionistProfile.objects.create(
             user=user,
             doctor=doctor,
-            profile_picture=validated_data['profile_picture'] 
         )
         return user
 
@@ -174,7 +170,7 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorProfile
         fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role',
-                  'specialty', 'session_duration', 'buffer_time', 'session_price','profile_picture_url']
+                  'specialty', 'session_duration', 'buffer_time', 'session_price','profile_picture_url','profile_picture']
 
     def get_first_name(self, obj):
         return obj.user.first_name
@@ -217,7 +213,6 @@ class PatientProfileSerializer(serializers.ModelSerializer):
     username = serializers.SerializerMethodField()
     email = serializers.SerializerMethodField()
     role = serializers.SerializerMethodField()
-    profile_picture_url = serializers.SerializerMethodField()
 
     class Meta:
         model = PatientProfile
@@ -239,8 +234,6 @@ class PatientProfileSerializer(serializers.ModelSerializer):
     def get_role(self, obj):
         return obj.user.role
     
-    def get_profile_picture_url(self, obj):          
-        return obj.profile_picture_url
 
     def update(self, instance, validated_data):
         user = instance.user
@@ -264,7 +257,6 @@ class ReceptionistProfileSerializer(serializers.ModelSerializer):
     email = serializers.SerializerMethodField()
     role = serializers.SerializerMethodField()
     doctor_name = serializers.SerializerMethodField()
-    profile_picture_url = serializers.SerializerMethodField()
 
     class Meta:
         model = ReceptionistProfile
@@ -289,8 +281,6 @@ class ReceptionistProfileSerializer(serializers.ModelSerializer):
     def get_doctor_name(self, obj):
         return obj.doctor.user.username
     
-    def get_profile_picture_url(self, obj):          
-        return obj.profile_picture_url
 
     def update(self, instance, validated_data):
         user = instance.user

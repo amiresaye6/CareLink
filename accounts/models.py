@@ -23,11 +23,7 @@ class PatientProfile(models.Model):
     date_of_birth = models.DateField(null=True, blank=True)
     phone_number = models.CharField(max_length=20, blank=True)
     medical_history = models.TextField(blank=True, null=True)
-    profile_picture = models.ImageField(upload_to='patients/profile_pics/', null=True, blank=True) 
     
-    @property
-    def profile_picture_url(self):                 
-        return f'/media/{self.profile_picture}'
     
     def __str__(self):
         return f"Patient: {self.user.username}"
@@ -63,11 +59,7 @@ class DoctorProfile(models.Model):
 class ReceptionistProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='receptionist_profile')
     doctor = models.OneToOneField(DoctorProfile, on_delete=models.CASCADE, related_name='receptionist_profile')
-    profile_picture = models.ImageField(upload_to='receptionists/profile_pics/', null=True, blank=True) 
     
-    @property
-    def profile_picture_url(self):                 
-        return f'/media/{self.profile_picture}'
     
     def __str__(self):
         return f"Receptionist: {self.user.username} for Dr. {self.doctor.user.username}"

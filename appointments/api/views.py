@@ -436,7 +436,7 @@ from appointments.api.serializers import (
     AppointmentListSerializer,
     AppointmentStatusUpdateSerializer,
 )
-
+from django.db.models import Q
 @api_view(['GET'])
 @permission_classes([IsReceptionist | IsDoctor])
 def today_queue(request):

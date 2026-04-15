@@ -9,7 +9,6 @@ from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
-import environ
 from .serializers import ResetPasswordRequestSerializer, ResetPasswordConfirmSerializer, changePasswordSerializer 
 from .serializers import SignUpAdminSerializer, SignUpDoctorSerializer , SignUpPatientSerializer, SignUpReceptionistSerializer, SignUpUserSerializer, UserSerializer
 from .serializers import DoctorProfileSerializer, PatientProfileSerializer, ReceptionistProfileSerializer, AdminProfileSerializer
@@ -208,7 +207,4 @@ def list_ActiveDoctorsBySpeciality(request):
     users = DoctorProfile.objects.filter( user__is_active=1 , specialty=doc_speciality)
     serializer = DoctorProfileSerializer(users , many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-
 

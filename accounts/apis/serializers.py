@@ -159,12 +159,11 @@ class SignUpUserSerializer(serializers.ModelSerializer):
 ###############################################################
 ###############################################################
 class DoctorProfileSerializer(serializers.ModelSerializer):
-
-    first_name = serializers.SerializerMethodField()
-    last_name = serializers.SerializerMethodField()
-    username = serializers.SerializerMethodField()
-    email = serializers.SerializerMethodField()
-    role = serializers.SerializerMethodField()
+    first_name = serializers.CharField(source='user.first_name')
+    last_name = serializers.CharField(source='user.last_name')
+    username = serializers.CharField(source='user.username')
+    email = serializers.EmailField(source='user.email')
+    role = serializers.CharField(source='user.role')
     profile_picture_url = serializers.SerializerMethodField()
 
     class Meta:
@@ -172,77 +171,48 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
         fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role',
                   'specialty', 'session_duration', 'buffer_time', 'session_price','profile_picture_url','profile_picture']
 
-    def get_first_name(self, obj):
-        return obj.user.first_name
-
-    def get_last_name(self, obj):
-        return obj.user.last_name
-
-    def get_username(self, obj):
-        return obj.user.username
-
-    def get_email(self, obj):
-        return obj.user.email
-
-    def get_role(self, obj):
-        return obj.user.role
-    
     def get_profile_picture_url(self, obj):          
         return obj.profile_picture_url
 
     def update(self, instance, validated_data):
         user = instance.user
-        data = self.context['request'].data
-        user.first_name = data.get('first_name', user.first_name)
-        user.last_name = data.get('last_name', user.last_name)
-        user.username = data.get('username', user.username)
-        user.email = data.get('email', user.email)
-        user.save()
+        user_data = validated_data.get('user')        
+        if user_data:
+            user.first_name = user_data.get('first_name', user.first_name)
+            user.last_name = user_data.get('last_name', user.last_name)
+            user.username = user_data.get('username', user.username)
+            user.email = user_data.get('email', user.email)
+            user.save()
         instance.specialty = validated_data.get('specialty', instance.specialty)
         instance.session_duration = validated_data.get('session_duration', instance.session_duration)
         instance.buffer_time = validated_data.get('buffer_time', instance.buffer_time)
         instance.session_price = validated_data.get('session_price', instance.session_price)
         instance.profile_picture = validated_data.get('profile_picture', instance.profile_picture)
         instance.save()
-        return instance 
-
+        return instance
+    
 
 class PatientProfileSerializer(serializers.ModelSerializer):
-    first_name = serializers.SerializerMethodField()
-    last_name = serializers.SerializerMethodField()
-    username = serializers.SerializerMethodField()
-    email = serializers.SerializerMethodField()
-    role = serializers.SerializerMethodField()
+    first_name = serializers.CharField(source='user.first_name')
+    last_name = serializers.CharField(source='user.last_name')
+    username = serializers.CharField(source='user.username')
+    email = serializers.EmailField(source='user.email')
+    role = serializers.CharField(source='user.role')
 
     class Meta:
         model = PatientProfile
         fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role',
                   'date_of_birth', 'phone_number', 'medical_history']
 
-    def get_first_name(self, obj):
-        return obj.user.first_name
-
-    def get_last_name(self, obj):
-        return obj.user.last_name
-
-    def get_username(self, obj):
-        return obj.user.username
-
-    def get_email(self, obj):
-        return obj.user.email
-
-    def get_role(self, obj):
-        return obj.user.role
-    
-
     def update(self, instance, validated_data):
         user = instance.user
-        data = self.context['request'].data
-        user.first_name = data.get('first_name', user.first_name)
-        user.last_name = data.get('last_name', user.last_name)
-        user.username = data.get('username', user.username)
-        user.email = data.get('email', user.email)
-        user.save()
+        user_data = validated_data.get('user')        
+        if user_data:
+            user.first_name = user_data.get('first_name', user.first_name)
+            user.last_name = user_data.get('last_name', user.last_name)
+            user.username = user_data.get('username', user.username)
+            user.email = user_data.get('email', user.email)
+            user.save()
         instance.date_of_birth = validated_data.get('date_of_birth', instance.date_of_birth)
         instance.phone_number = validated_data.get('phone_number', instance.phone_number)
         instance.medical_history = validated_data.get('medical_history', instance.medical_history)
@@ -251,11 +221,11 @@ class PatientProfileSerializer(serializers.ModelSerializer):
 
 
 class ReceptionistProfileSerializer(serializers.ModelSerializer):
-    first_name = serializers.SerializerMethodField()
-    last_name = serializers.SerializerMethodField()
-    username = serializers.SerializerMethodField()
-    email = serializers.SerializerMethodField()
-    role = serializers.SerializerMethodField()
+    first_name = serializers.CharField(source='user.first_name')
+    last_name = serializers.CharField(source='user.last_name')
+    username = serializers.CharField(source='user.username')
+    email = serializers.EmailField(source='user.email')
+    role = serializers.CharField(source='user.role')
     doctor_name = serializers.SerializerMethodField()
 
     class Meta:
@@ -263,33 +233,19 @@ class ReceptionistProfileSerializer(serializers.ModelSerializer):
         fields = ['id', 'first_name', 'last_name', 'username', 'email', 'role',
                   'doctor', 'doctor_name']
 
-    def get_first_name(self, obj):
-        return obj.user.first_name
-
-    def get_last_name(self, obj):
-        return obj.user.last_name
-
-    def get_username(self, obj):
-        return obj.user.username
-
-    def get_email(self, obj):
-        return obj.user.email
-
-    def get_role(self, obj):
-        return obj.user.role
-
     def get_doctor_name(self, obj):
         return obj.doctor.user.username
     
 
     def update(self, instance, validated_data):
         user = instance.user
-        data = self.context['request'].data
-        user.first_name = data.get('first_name', user.first_name)
-        user.last_name = data.get('last_name', user.last_name)
-        user.username = data.get('username', user.username)
-        user.email = data.get('email', user.email)
-        user.save()
+        user_data = validated_data.get('user')        
+        if user_data:
+            user.first_name = user_data.get('first_name', user.first_name)
+            user.last_name = user_data.get('last_name', user.last_name)
+            user.username = user_data.get('username', user.username)
+            user.email = user_data.get('email', user.email)
+            user.save()
         instance.doctor = validated_data.get('doctor', instance.doctor)
         instance.save()
         instance.refresh_from_db()

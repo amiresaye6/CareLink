@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db.models import Q, Count, F, Case, When, IntegerField, Avg
 from django.utils import timezone
 from datetime import timedelta
@@ -76,7 +76,7 @@ class AnalyticsViewSet(viewsets.ViewSet):
         serializer = UserAnalyticsSerializer(data)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
     def doctors(self, request):
         """Doctor analytics"""
         
@@ -354,8 +354,7 @@ class AnalyticsViewSet(viewsets.ViewSet):
         
         serializer = AuditTrailAnalyticsSerializer(data)
         return Response(serializer.data, status=status.HTTP_200_OK)
-    
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
     def overview(self, request):
         """Dashboard overview - all key metrics"""
         

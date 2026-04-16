@@ -1,8 +1,8 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
+from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
-
+from accounts.apis.permissions import IsAdmin
 from accounts.models import User
 from .serializer import (
     UserListSerializer,
@@ -31,7 +31,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
     #  to=do return it when azzazy finishs his part :__:
     # permission_classes = [IsAuthenticated]
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, IsAdmin]
 
     def get_serializer_class(self):
         """

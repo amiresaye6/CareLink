@@ -144,3 +144,14 @@ class AdminAuditLogSerializer(serializers.ModelSerializer):
         if obj.changed_by:
             return f"{obj.changed_by.first_name} {obj.changed_by.last_name}".strip() or obj.changed_by.username
         return "System"
+
+class RescheduleRequestListSerializer(serializers.ModelSerializer):
+    patient_name = serializers.CharField(source='appointment.patient.user.username', read_only=True)
+    current_datetime = serializers.DateTimeField(source='appointment.scheduled_datetime', read_only=True)
+    
+    class Meta:
+        model = RescheduleRequest
+        fields = [
+            'id', 'appointment', 'patient_name', 'current_datetime', 
+            'proposed_datetime', 'reason', 'status', 'created_at'
+        ]

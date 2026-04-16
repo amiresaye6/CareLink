@@ -10,7 +10,7 @@ from rest_framework.response import Response
 
 from accounts.models import DoctorProfile, PatientProfile
 from appointments.models import WeeklySchedule, ScheduleException, Appointment, AppointmentAuditTrail, RescheduleRequest
-from appointments.api.serializers import DoctorAppointmentDetailsSerializer, BookAppointmentSerializer, RescheduleRequestSerializer, AdminAuditLogSerializer
+from appointments.api.serializers import DoctorAppointmentDetailsSerializer, BookAppointmentSerializer, RescheduleRequestSerializer, AdminAuditLogSerializer, RescheduleRequestListSerializer
 from rest_framework.permissions import IsAuthenticated , AllowAny
 from accounts.apis.permissions import IsPatient, IsDoctor, IsAdmin, IsReceptionist
 from dashboard.api.doctor.views import update_logged_in_doctor_appointment_status
@@ -626,4 +626,20 @@ def respond_to_reschedule(request, request_id):
 def admin_audit_table(request):
     logs = AppointmentAuditTrail.objects.all().select_related('changed_by', 'appointment')
     serializer = AdminAuditLogSerializer(logs, many=True)
+    return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsReceptionist])
+def pending_reschedule_requests(request):
+    try:
+        doctor = request.user.receptionist_profile.doctor
+    except Exception:
+        return Response({'message': 'Receptionist profile not found'}, status=404)
+
+    requests = RescheduleRequest.objects.filter(
+        appointment__doctor=doctor,
+        status='PENDING'
+    ).select_related('appointment__patient__user').order_by('-created_at')
+
+    serializer = RescheduleRequestListSerializer(requests, many=True)
     return Response(serializer.data)

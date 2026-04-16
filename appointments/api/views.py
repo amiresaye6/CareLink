@@ -9,8 +9,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
 from accounts.models import DoctorProfile, PatientProfile
-from appointments.models import WeeklySchedule, ScheduleException, Appointment
-from appointments.api.serializers import DoctorAppointmentDetailsSerializer, BookAppointmentSerializer
+from appointments.models import WeeklySchedule, ScheduleException, Appointment, AppointmentAuditTrail, RescheduleRequest
+from appointments.api.serializers import DoctorAppointmentDetailsSerializer, BookAppointmentSerializer, RescheduleRequestSerializer, AdminAuditLogSerializer, RescheduleRequestListSerializer
 from rest_framework.permissions import IsAuthenticated , AllowAny
 from accounts.apis.permissions import IsPatient, IsDoctor, IsAdmin, IsReceptionist
 from dashboard.api.doctor.views import update_logged_in_doctor_appointment_status
@@ -537,3 +537,111 @@ def update_appointment_status(request, appointment_id):
         status=status.HTTP_400_BAD_REQUEST,
     )
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsPatient])
+def request_reschedule(request, appointment_id):
+    appointment = get_object_or_404(Appointment, pk=appointment_id, patient__user=request.user)
+    
+    if appointment.status in ['CANCELLED', 'COMPLETED']:
+        return Response({'message': 'Cannot reschedule this appointment.'}, status=400)
+
+    ser = RescheduleRequestSerializer(data=request.data)
+    if not ser.is_valid():
+        return Response(ser.errors, status=400)
+
+    proposed_dt = ser.validated_data['proposed_datetime']
+
+    if not _is_datetime_in_doctor_availability(appointment.doctor, proposed_dt):
+        return Response({'message': 'Doctor is not available at this time.'}, status=400)
+
+    with transaction.atomic():
+        res_req = ser.save(appointment=appointment)
+        
+        AppointmentAuditTrail.objects.create(
+            appointment=appointment,
+            old_datetime=appointment.scheduled_datetime,
+            new_datetime=proposed_dt,
+            changed_by=request.user,
+            reason=ser.validated_data.get('reason', 'Patient requested reschedule'),
+            action_type='RESCHEDULE_REQUESTED',
+            actor_role='PATIENT'
+        )
+
+    return Response({'message': 'Request sent to receptionist.'}, status=201)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsReceptionist])
+def respond_to_reschedule(request, request_id):
+    res_request = get_object_or_404(RescheduleRequest, pk=request_id, status='PENDING')
+    action = request.data.get('action')
+    note = request.data.get('note', '')
+
+    with transaction.atomic():
+        if action == 'APPROVE':
+            if Appointment.objects.filter(doctor=res_request.appointment.doctor, 
+                                        scheduled_datetime=res_request.proposed_datetime).exclude(status='CANCELLED').exists():
+                return Response({'message': 'Slot no longer available.'}, status=400)
+
+            appt = res_request.appointment
+            old_time = appt.scheduled_datetime
+            
+            appt.scheduled_datetime = res_request.proposed_datetime
+            appt.save()
+
+            res_request.status = 'APPROVED'
+            res_request.responded_by = request.user
+            res_request.response_note = note
+            res_request.save()
+
+            AppointmentAuditTrail.objects.create(
+                appointment=appt,
+                old_datetime=old_time,
+                new_datetime=appt.scheduled_datetime,
+                changed_by=request.user,
+                reason=f"Approved: {note}",
+                action_type='RESCHEDULE_APPROVED',
+                actor_role='RECEPTIONIST'
+            )
+
+        elif action == 'REJECT':
+            res_request.status = 'REJECTED'
+            res_request.responded_by = request.user
+            res_request.response_note = note
+            res_request.save()
+
+            AppointmentAuditTrail.objects.create(
+                appointment=res_request.appointment,
+                old_datetime=res_request.appointment.scheduled_datetime,
+                new_datetime=res_request.proposed_datetime,
+                changed_by=request.user,
+                reason=f"Rejected: {note}",
+                action_type='RESCHEDULE_REJECTED',
+                actor_role='RECEPTIONIST'
+            )
+
+    return Response({'message': f'Reschedule {action.lower()}ed.'})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsAdmin])
+def admin_audit_table(request):
+    logs = AppointmentAuditTrail.objects.all().select_related('changed_by', 'appointment')
+    serializer = AdminAuditLogSerializer(logs, many=True)
+    return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsReceptionist])
+def pending_reschedule_requests(request):
+    try:
+        doctor = request.user.receptionist_profile.doctor
+    except Exception:
+        return Response({'message': 'Receptionist profile not found'}, status=404)
+
+    requests = RescheduleRequest.objects.filter(
+        appointment__doctor=doctor,
+        status='PENDING'
+    ).select_related('appointment__patient__user').order_by('-created_at')
+
+    serializer = RescheduleRequestListSerializer(requests, many=True)
+    return Response(serializer.data)

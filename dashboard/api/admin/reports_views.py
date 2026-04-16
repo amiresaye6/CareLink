@@ -1,14 +1,13 @@
 import csv
 from django.http import HttpResponse
 from rest_framework import viewsets
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from accounts.models import User, DoctorProfile, PatientProfile, ReceptionistProfile
 from appointments.models import Appointment
-from django.db.models import Q, Count
-from django.utils import timezone
-from datetime import timedelta
+from django.db.models import Q
 import datetime
+from accounts.apis.permissions import IsAdmin
 
 
 class ReportsViewset(viewsets.ViewSet):
@@ -31,8 +30,7 @@ class ReportsViewset(viewsets.ViewSet):
             
         return response
 
-    permission_classes = [AllowAny]
-    
+    permission_classes = [IsAuthenticated, IsAdmin]
     @action(detail=False, methods=['get'])
     def users(self, request):
         """User List Report"""
@@ -58,7 +56,8 @@ class ReportsViewset(viewsets.ViewSet):
                 Q(username__icontains=search) |
                 Q(email__icontains=search) |
                 Q(first_name__icontains=search) |
-                Q(last_name__icontains=search)
+                Q(last_name__icontains=search) |
+                Q(id__icontains=search) 
             )
 
         for user in queryset:
@@ -98,6 +97,7 @@ class ReportsViewset(viewsets.ViewSet):
             queryset = queryset.filter(
                 Q(user__first_name__icontains=search) |
                 Q(user__last_name__icontains=search) |
+                Q(user__id__icontains=search) |
                 Q(user__email__icontains=search)
             )
 
@@ -139,6 +139,7 @@ class ReportsViewset(viewsets.ViewSet):
                 Q(user__first_name__icontains=search) |
                 Q(user__last_name__icontains=search) |
                 Q(user__email__icontains=search) |
+                Q(user__id__icontains=search) |
                 Q(phone_number__icontains=search)
             )
 
@@ -182,6 +183,7 @@ class ReportsViewset(viewsets.ViewSet):
             queryset = queryset.filter(
                 Q(user__first_name__icontains=search) |
                 Q(user__last_name__icontains=search) |
+                Q(user__id__icontains=search) |
                 Q(user__email__icontains=search)
             )
 

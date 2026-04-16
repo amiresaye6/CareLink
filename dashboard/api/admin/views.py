@@ -75,6 +75,7 @@ class UserViewSet(viewsets.ModelViewSet):
                 Q(username__icontains=search) |
                 Q(email__icontains=search) |
                 Q(first_name__icontains=search) |
+                Q(id__icontains=search) |
                 Q(last_name__icontains=search)
             )
             

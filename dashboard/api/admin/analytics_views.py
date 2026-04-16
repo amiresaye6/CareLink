@@ -1,10 +1,11 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q, Count, F, Case, When, IntegerField, Avg
 from django.utils import timezone
 from datetime import timedelta
+from accounts.apis.permissions import IsAdmin
 
 from accounts.models import User, PatientProfile, DoctorProfile
 from appointments.models import Appointment, WeeklySchedule, ScheduleException, AppointmentAuditTrail
@@ -41,7 +42,7 @@ class AnalyticsViewSet(viewsets.ViewSet):
     - ?specialty=CARDIOLOGY -> Filter by specialty
     """
     
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, IsAdmin]
     
     @action(detail=False, methods=['get'])
     def users(self, request):

@@ -37,6 +37,24 @@ class Appointment(models.Model):
             models.UniqueConstraint(fields=['doctor', 'scheduled_datetime'], name='unique_doctor_slot')
         ]
 
+class RescheduleRequest(models.Model):
+    STATUS_CHOICES = (
+        ('PENDING', 'Pending'),
+        ('APPROVED', 'Approved'),
+        ('REJECTED', 'Rejected'),
+    )
+    appointment = models.ForeignKey(Appointment, on_delete=models.CASCADE, related_name='reschedule_requests')
+    proposed_datetime = models.DateTimeField()
+    reason = models.TextField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    created_at = models.DateTimeField(auto_now_add=True)
+    responded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    response_note = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"Reschedule for Appt #{self.appointment.id} to {self.proposed_datetime}"
+
+
 class AppointmentAuditTrail(models.Model):
     appointment = models.ForeignKey(Appointment, on_delete=models.CASCADE, related_name='audit_trails')
     old_datetime = models.DateTimeField()
@@ -44,3 +62,8 @@ class AppointmentAuditTrail(models.Model):
     changed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     reason = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
+    action_type = models.CharField(max_length=50, null=True, blank=True)
+    actor_role = models.CharField(max_length=50, null=True, blank=True)
+
+    class Meta:
+        ordering = ['-timestamp']

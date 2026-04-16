@@ -1,5 +1,5 @@
 from rest_framework import serializers
-
+from appointments.models import Appointment, AppointmentAuditTrail, RescheduleRequest
 from dashboard.api.doctor.serializers import (
     DoctorProfileModelSerializer,
     WeeklyScheduleModelSerializer,
@@ -120,3 +120,27 @@ class AppointmentStatusUpdateSerializer(serializers.ModelSerializer):
                 f"Allowed transitions: {allowed}"
             )
         return new_status
+
+class RescheduleRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RescheduleRequest
+        fields = ['id', 'proposed_datetime', 'reason', 'status', 'response_note', 'created_at']
+        read_only_fields = ['status', 'response_note', 'created_at']
+
+class AdminAuditLogSerializer(serializers.ModelSerializer):
+    user_full_name = serializers.SerializerMethodField()
+    role = serializers.CharField(source='actor_role')
+    appointment_id = serializers.IntegerField(source='appointment.id')
+
+    class Meta:
+        model = AppointmentAuditTrail
+        fields = [
+            'id', 'appointment_id', 'user_full_name', 'role', 
+            'action_type', 'old_datetime', 'new_datetime', 
+            'reason', 'timestamp'
+        ]
+
+    def get_user_full_name(self, obj):
+        if obj.changed_by:
+            return f"{obj.changed_by.first_name} {obj.changed_by.last_name}".strip() or obj.changed_by.username
+        return "System"

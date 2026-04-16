@@ -451,16 +451,18 @@ def today_queue(request):
 
         appointments = Appointment.objects.filter(
             scheduled_datetime__date=today,
-            doctor=doctor
+            doctor=doctor,
+            status='CHECKED_IN' 
         )
     except:
-        appointments = Appointment.objects.filter(scheduled_datetime__date=today)
+        appointments = Appointment.objects.filter(
+            scheduled_datetime__date=today, 
+            status='CHECKED_IN'
+        )
     
-    appointments = appointments.exclude(
-        status__in=['CANCELLED', 'NO_SHOW']
-    ).select_related(
+    appointments = appointments.select_related(
         'patient__user', 'doctor__user'
-    ).order_by('check_in_time', 'scheduled_datetime')
+    ).order_by('check_in_time')
 
     serializer = QueueSerializer(appointments, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)

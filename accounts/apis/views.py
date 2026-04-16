@@ -1,4 +1,4 @@
-from rest_framework.decorators import APIView, api_view ,permission_classes
+from rest_framework.decorators import api_view ,permission_classes
 from rest_framework.response import Response
 from accounts.apis.permissions import IsAdmin , IsDoctor , IsPatient ,IsReceptionist
 from accounts.models import DoctorProfile, User , ReceptionistProfile ,PatientProfile

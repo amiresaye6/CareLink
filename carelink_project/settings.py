@@ -120,7 +120,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': env('DB_NAME'),
         'USER': env('DB_USER'),
-        'PASSWORD':  env('DB_PASSWORD'),
+        'PASSWORD':  '',
         'HOST': env('DB_HOST'),
         'PORT': env('DB_PORT'),
     }
@@ -190,5 +190,5 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = env('DB_HOST_USER')
-EMAIL_HOST_PASSWORD = env('DB_HOST_PASSWORD')
+EMAIL_HOST_USER = env('HOST_USER')
+EMAIL_HOST_PASSWORD = env('HOST_PASSWORD')

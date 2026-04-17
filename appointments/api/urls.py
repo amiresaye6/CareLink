@@ -9,6 +9,7 @@ from appointments.api.views import (
     request_reschedule,
     respond_to_reschedule,
     admin_audit_table,
+    pending_reschedule_requests
 )
 
 urlpatterns = [
@@ -21,4 +22,5 @@ urlpatterns = [
     path('appointment/<int:appointment_id>/reschedule/request/', request_reschedule, name='appointments.api.request_reschedule'),
     path('reschedule-request/<int:request_id>/respond/', respond_to_reschedule, name='appointments.api.respond_to_reschedule'),
     path('admin/audit-logs/', admin_audit_table, name='appointments.api.admin_audit_table'),
+    path('reception/reschedule-requests/pending/', pending_reschedule_requests, name='appointments.api.pending_reschedules'),
 ]

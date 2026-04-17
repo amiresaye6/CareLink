@@ -149,7 +149,7 @@ def _appointment_interval_end(appt):
     return appt.scheduled_datetime + timedelta(minutes=dur)
 
 
-def _patient_active_same_doctor_appointment(patient, doctor, now):
+def _patient_active_same_doctor_appointment(patient, doctor, now, exclude_appointment_id=None):
     """
     Another visit with this doctor is not allowed while an existing appointment
     with this doctor is still upcoming or in progress (interval end > now).
@@ -161,12 +161,14 @@ def _patient_active_same_doctor_appointment(patient, doctor, now):
         .order_by('scheduled_datetime')
     )
     for appt in qs:
+        if exclude_appointment_id and appt.id == exclude_appointment_id:
+            continue
         if _appointment_interval_end(appt) > now:
             return appt
     return None
 
 
-def _patient_has_overlapping_appointment(patient, start_dt, end_dt):
+def _patient_has_overlapping_appointment(patient, start_dt, end_dt, exclude_appointment_id=None):
     """
     True if [start_dt, end_dt) overlaps any existing non-cancelled appointment
     interval (any doctor), using each doctor's session duration.
@@ -184,6 +186,8 @@ def _patient_has_overlapping_appointment(patient, start_dt, end_dt):
         .select_related('doctor')
     )
     for appt in qs:
+        if exclude_appointment_id and appt.id == exclude_appointment_id:
+            continue
         appt_end = _appointment_interval_end(appt)
         if appt_end <= now:
             continue
@@ -192,7 +196,7 @@ def _patient_has_overlapping_appointment(patient, start_dt, end_dt):
     return False
 
 
-def _patient_busy_intervals(patient, range_start, range_end):
+def _patient_busy_intervals(patient, range_start, range_end, exclude_appointment_id=None):
     """Upcoming non-cancelled appointment intervals overlapping the requested window (any doctor)."""
     intervals = []
     now = timezone.now()
@@ -206,6 +210,8 @@ def _patient_busy_intervals(patient, range_start, range_end):
         .order_by('scheduled_datetime')
     )
     for appt in qs:
+        if exclude_appointment_id and appt.id == exclude_appointment_id:
+            continue
         appt_end = _appointment_interval_end(appt)
         if appt_end <= now:
             continue
@@ -222,21 +228,21 @@ def _patient_busy_intervals(patient, range_start, range_end):
     return intervals
 
 
-def _filter_slots_for_patient(slots, patient, doctor, duration_min):
+def _filter_slots_for_patient(slots, patient, doctor, duration_min, exclude_appointment_id=None):
     """Remove slots that overlap the patient's other appointments (any doctor)."""
     if not slots:
         return []
     out = []
     for slot in slots:
         end_slot = slot + timedelta(minutes=duration_min)
-        if not _patient_has_overlapping_appointment(patient, slot, end_slot):
+        if not _patient_has_overlapping_appointment(patient, slot, end_slot, exclude_appointment_id=exclude_appointment_id):
             out.append(slot)
     return out
 
 
-def _build_patient_booking_for_response(patient, doctor, slots, range_start, range_end, now):
+def _build_patient_booking_for_response(patient, doctor, slots, range_start, range_end, now, exclude_appointment_id=None):
     """Returns (filtered_available_slots, patient_booking_dict) for GET doctor details."""
-    active_same = _patient_active_same_doctor_appointment(patient, doctor, now)
+    active_same = _patient_active_same_doctor_appointment(patient, doctor, now, exclude_appointment_id=exclude_appointment_id)
     if active_same:
         appt_end = _appointment_interval_end(active_same)
         pb = {
@@ -250,16 +256,16 @@ def _build_patient_booking_for_response(patient, doctor, slots, range_start, ran
                     'You can book again after that appointment has finished.'
                 ),
             },
-            'busy_intervals': _patient_busy_intervals(patient, range_start, range_end),
+            'busy_intervals': _patient_busy_intervals(patient, range_start, range_end, exclude_appointment_id=exclude_appointment_id),
         }
         return [], pb
 
     duration_min = int(doctor.session_duration or 30)
-    filtered = _filter_slots_for_patient(slots, patient, doctor, duration_min)
+    filtered = _filter_slots_for_patient(slots, patient, doctor, duration_min, exclude_appointment_id=exclude_appointment_id)
     pb = {
         'can_book_with_this_doctor': True,
         'same_doctor_block': None,
-        'busy_intervals': _patient_busy_intervals(patient, range_start, range_end),
+        'busy_intervals': _patient_busy_intervals(patient, range_start, range_end, exclude_appointment_id=exclude_appointment_id),
     }
     return filtered, pb
 
@@ -308,8 +314,18 @@ def doctor_appointment_details(request, id):
     if is_patient:
         patient = _get_logged_in_patient(request)
         if patient:
+            exclude_appt_id = None
+            raw_ex = (request.query_params.get('reschedule_appointment_id') or '').strip()
+            if raw_ex:
+                ex_id = _parse_int(raw_ex, 0)
+                if ex_id > 0:
+                   
+                    appt = Appointment.objects.filter(pk=ex_id, patient=patient, doctor=doctor).exclude(status='CANCELLED').first()
+                    if appt:
+                        exclude_appt_id = appt.id
+
             available_slots, patient_booking = _build_patient_booking_for_response(
-                patient, doctor, available_slots, range_start, range_end, now
+                patient, doctor, available_slots, range_start, range_end, now, exclude_appointment_id=exclude_appt_id
             )
 
     data = {
@@ -587,7 +603,8 @@ def respond_to_reschedule(request, request_id):
             old_time = appt.scheduled_datetime
             
             appt.scheduled_datetime = res_request.proposed_datetime
-            appt.save()
+            appt.status = 'CONFIRMED'
+            appt.save(update_fields=['scheduled_datetime', 'status'])
 
             res_request.status = 'APPROVED'
             res_request.responded_by = request.user

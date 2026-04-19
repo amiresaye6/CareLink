@@ -161,6 +161,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
+# UTC+2 (IANA POSIX: Etc/GMT-2). Keeps slot generation, bookings, and seed on the same wall clock.
 TIME_ZONE = 'UTC'
 
 USE_I18N = True
